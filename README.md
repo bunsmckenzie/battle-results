@@ -74,3 +74,19 @@ Run all tests with:
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+## Step 3: conservative hero matching
+
+Hero portraits can be checked against `assets/heroes/hero_lookup.png` without OCR:
+
+```bash
+python app.py match-heroes --image tests/fixtures/herocomparison.jpg
+```
+
+The matcher uses SIFT local image features and intentionally returns `UNKNOWN` when the evidence is weak. This matters because the battle UI can show alternate hero artwork/skins that differ from the default lookup portrait. An `UNKNOWN` result must be reviewed or resolved from an expanded reference catalog; it must not be silently converted to the nearest candidate.
+
+Run all tests with:
+
+```bash
+python -m unittest discover -s tests -v
+```

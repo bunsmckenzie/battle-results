@@ -1,6 +1,7 @@
 import argparse
 import db
 from layout import LayoutCatalog, write_debug_crops
+from hero_matcher import match_battle_heroes
 
 
 def main():
@@ -12,6 +13,8 @@ def main():
     debug.add_argument('--type', required=True, choices=LayoutCatalog.load().names())
     debug.add_argument('--image', required=True)
     debug.add_argument('--out', default='debug_crops')
+    heroes = sub.add_parser('match-heroes')
+    heroes.add_argument('--image', required=True)
     args = parser.parse_args()
     if args.command == 'init-db':
         db.init_db()
@@ -22,6 +25,11 @@ def main():
     elif args.command == 'debug-layout':
         paths = write_debug_crops(args.image, args.type, args.out)
         print(f'Wrote {len(paths)} debug crops to {args.out}')
+    elif args.command == 'match-heroes':
+        for slot, match in match_battle_heroes(args.image).items():
+            label = match.name if match.accepted else 'UNKNOWN'
+            candidates = ', '.join(f'{c.name}:{c.good_matches}' for c in match.candidates)
+            print(f'{slot}: {label} confidence={match.confidence:.3f} matches={match.good_matches} candidates=[{candidates}]')
 
 
 if __name__ == '__main__':
