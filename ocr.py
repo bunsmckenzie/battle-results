@@ -1,15 +1,37 @@
+"""Numeric OCR helpers with deterministic parsing and explicit confidence."""
+from __future__ import annotations
+
 import re
+from dataclasses import dataclass
 import cv2
-from paddleocr import PaddleOCR
+
+
+@dataclass(frozen=True)
+class OCRReading:
+    value: int | float
+    confidence: float
+    text: str
 
 
 class NumericOCR:
-    def __init__(self):
-        self.ocr = PaddleOCR(
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False,
-        )
+    def __init__(self, engine=None):
+        self._engine = engine
+
+    @property
+    def ocr(self):
+        if self._engine is None:
+            try:
+                from paddleocr import PaddleOCR
+            except ImportError as exc:
+                raise RuntimeError(
+                    "PaddleOCR is not installed. Run: python -m pip install -r requirements.txt"
+                ) from exc
+            self._engine = PaddleOCR(
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+            )
+        return self._engine
 
     @staticmethod
     def crop(image, box):
@@ -27,19 +49,30 @@ class NumericOCR:
             raise ValueError(f'No number found in OCR text: {text!r}')
         return float(m.group()) if allow_decimal else int(m.group())
 
-    def read(self, image, box, allow_decimal=False):
-        crop = self.crop(image, box)
-        crop = cv2.resize(crop, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-        results = self.ocr.predict(crop)
-        texts = []
+    @staticmethod
+    def _extract_text_and_confidence(results):
+        texts, scores = [], []
         for result in results:
-            # PaddleOCR 3.x exposes a JSON-like result representation.
             data = result.json if hasattr(result, 'json') else None
             if callable(data):
                 data = data()
             if isinstance(data, dict):
                 inner = data.get('res', data)
-                texts.extend(inner.get('rec_texts', []))
+                texts.extend(str(x) for x in inner.get('rec_texts', []))
+                scores.extend(float(x) for x in inner.get('rec_scores', []))
         if not texts:
             raise ValueError('No OCR text detected')
-        return self.parse_number(' '.join(texts), allow_decimal)
+        confidence = min(scores) if scores else 0.0
+        return ' '.join(texts), confidence
+
+    def read_image(self, image, allow_decimal=False) -> OCRReading:
+        if image is None or image.size == 0:
+            raise ValueError('A non-empty image is required')
+        enlarged = cv2.resize(image, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
+        results = self.ocr.predict(enlarged)
+        text, confidence = self._extract_text_and_confidence(results)
+        value = self.parse_number(text, allow_decimal)
+        return OCRReading(value, confidence, text)
+
+    def read(self, image, box, allow_decimal=False):
+        return self.read_image(self.crop(image, box), allow_decimal).value

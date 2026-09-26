@@ -90,3 +90,13 @@ Run all tests with:
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+## Step 4: hero join-value OCR
+
+Read only the top-most adjacent equipment value for each of the six battle heroes:
+
+```bash
+python app.py read-hero-values --image tests/fixtures/herocomparison.jpg
+```
+
+Only integer values from 0 through 10 are accepted. OCR text and recognition confidence are retained for review; out-of-range values fail validation instead of being silently stored.
