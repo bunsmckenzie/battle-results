@@ -5,6 +5,7 @@ from hero_matcher import match_battle_heroes
 from hero_values import extract_battle_join_values
 from battle_heroes import analyze_battle_heroes
 from outcome_reader import extract_battle_outcome
+from percent_reader import extract_ratios_bonuses
 
 
 def main():
@@ -22,6 +23,8 @@ def main():
     values.add_argument('--image', required=True)
     outcome = sub.add_parser('read-outcome')
     outcome.add_argument('--image', required=True)
+    rb = sub.add_parser('read-ratios-bonuses')
+    rb.add_argument('--image', required=True)
     combined = sub.add_parser('analyze-heroes')
     combined.add_argument('--image', required=True)
     args = parser.parse_args()
@@ -40,6 +43,12 @@ def main():
     elif args.command == 'read-outcome':
         for field, reading in extract_battle_outcome(args.image).items():
             print(f'{field}: {reading.value:,} confidence={reading.confidence:.3f}')
+    elif args.command == 'read-ratios-bonuses':
+        result = extract_ratios_bonuses(args.image)
+        for slot, item in result['ratios'].items():
+            r=item['reading']; print(f"{slot}: {item['troop_type']} {r.value:.2f}% confidence={r.confidence:.3f}")
+        for field, r in result['bonuses'].items():
+            print(f'{field}: +{r.value:.1f}% confidence={r.confidence:.3f}')
     elif args.command == 'analyze-heroes':
         for slot, reading in analyze_battle_heroes(args.image).items():
             label = reading.name if reading.accepted else 'UNKNOWN'
