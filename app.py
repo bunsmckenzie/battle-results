@@ -6,6 +6,7 @@ from hero_values import extract_battle_join_values
 from battle_heroes import analyze_battle_heroes
 from outcome_reader import extract_battle_outcome
 from percent_reader import extract_ratios_bonuses
+from battle_processor import process_battle, load_battle
 
 
 def main():
@@ -27,6 +28,13 @@ def main():
     rb.add_argument('--image', required=True)
     combined = sub.add_parser('analyze-heroes')
     combined.add_argument('--image', required=True)
+    process = sub.add_parser('process-battle')
+    process.add_argument('--outcome', required=True)
+    process.add_argument('--heroes', required=True)
+    process.add_argument('--ratios-bonuses', required=True)
+    process.add_argument('--notes')
+    show = sub.add_parser('show-battle')
+    show.add_argument('battle_key')
     args = parser.parse_args()
     if args.command == 'init-db':
         db.init_db()
@@ -53,6 +61,20 @@ def main():
         for slot, reading in analyze_battle_heroes(args.image).items():
             label = reading.name if reading.accepted else 'UNKNOWN'
             print(f'{slot}: {label} join_value={reading.join_value} match_confidence={reading.match_confidence:.3f} value_confidence={reading.value_confidence:.3f}')
+    elif args.command == 'process-battle':
+        key=process_battle(args.outcome,args.heroes,args.ratios_bonuses,notes=args.notes)
+        print(f'Battle saved: {key}')
+    elif args.command == 'show-battle':
+        b=load_battle(args.battle_key)
+        print(f'Battle {b["battle"][1]} created={b["battle"][2]}')
+        print('OUTCOMES')
+        for r in b['outcomes']: print('  '+ ' | '.join(map(str,r)))
+        print('RATIOS')
+        for side,troop,ratio,present in b['ratios']: print(f'  {side}.{troop}: {ratio:.2f}% present={present}')
+        print('BONUSES')
+        for side,troop,stat,value in b['bonuses']: print(f'  {side}.{troop}_{stat}: +{value:.1f}%')
+        print('HEROES')
+        for side,role,slot,name,value in b['heroes']: print(f'  {side}.{role}{slot}: {name} join_value={value}')
     elif args.command == 'match-heroes':
         for slot, match in match_battle_heroes(args.image).items():
             label = match.name if match.accepted else 'UNKNOWN'

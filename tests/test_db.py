@@ -32,14 +32,14 @@ class DatabaseTests(unittest.TestCase):
             migrations = conn.execute(
                 'SELECT version FROM schema_migrations ORDER BY version'
             ).fetchall()
-            self.assertEqual(migrations, [('001_initial_schema.sql',)])
+            self.assertEqual(migrations, [('001_initial_schema.sql',), ('002_battle_relationship_model.sql',)])
 
     def test_init_is_idempotent(self):
         db.init_db(self.db_path)
         db.init_db(self.db_path)
         with closing(db.connect(self.db_path)) as conn:
             count = conn.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0]
-            self.assertEqual(count, 1)
+            self.assertEqual(count, 2)
 
     def test_seed_loads_22_heroes_and_is_idempotent(self):
         db.init_db(self.db_path)
@@ -60,12 +60,12 @@ class DatabaseTests(unittest.TestCase):
             battle_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
             with self.assertRaises(sqlite3.IntegrityError):
                 conn.execute(
-                    'INSERT INTO battle_heroes(battle_id, slot, hero_id, join_value) VALUES (?, 1, 999, 10)',
+                    "INSERT INTO battle_heroes(battle_id, side, role, slot, hero_id, join_value) VALUES (?, 'attacker', 'lead', 1, 999, 10)",
                     (battle_id,),
                 )
             with self.assertRaises(sqlite3.IntegrityError):
                 conn.execute(
-                    'INSERT INTO battle_heroes(battle_id, slot, hero_id, join_value) VALUES (?, 1, 1, 11)',
+                    "INSERT INTO battle_heroes(battle_id, side, role, slot, hero_id, join_value) VALUES (?, 'attacker', 'lead', 1, 1, 11)",
                     (battle_id,),
                 )
 
