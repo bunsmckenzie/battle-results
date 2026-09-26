@@ -7,6 +7,8 @@ from battle_heroes import analyze_battle_heroes
 from outcome_reader import extract_battle_outcome
 from percent_reader import extract_ratios_bonuses
 from battle_processor import process_battle, load_battle, add_joiner, remove_joiner
+from screenshot_classifier import classify_image, classify_folder
+from folder_router import resolve_battle_images
 
 
 def main():
@@ -29,9 +31,11 @@ def main():
     combined = sub.add_parser('analyze-heroes')
     combined.add_argument('--image', required=True)
     process = sub.add_parser('process-battle')
-    process.add_argument('--outcome', required=True)
-    process.add_argument('--heroes', required=True)
-    process.add_argument('--ratios-bonuses', required=True)
+    source = process.add_mutually_exclusive_group(required=True)
+    source.add_argument('--folder')
+    source.add_argument('--outcome')
+    process.add_argument('--heroes')
+    process.add_argument('--ratios-bonuses')
     process.add_argument('--notes')
     show = sub.add_parser('show-battle')
     show.add_argument('battle_key')
@@ -43,8 +47,14 @@ def main():
     remj.add_argument('battle_key')
     remj.add_argument('--side', required=True, choices=('attacker','defender'))
     remj.add_argument('--slot', required=True, type=int)
+    ci=sub.add_parser('classify-image'); ci.add_argument('--image',required=True)
+    cf=sub.add_parser('classify-folder'); cf.add_argument('--folder',required=True)
     args = parser.parse_args()
-    if args.command == 'init-db':
+    if args.command == 'classify-image':
+        r=classify_image(args.image); print(f'{r.image_type} confidence={r.confidence:.3f}')
+    elif args.command == 'classify-folder':
+        for path,r in classify_folder(args.folder).items(): print(f'{path}: {r.image_type} confidence={r.confidence:.3f}')
+    elif args.command == 'init-db':
         db.init_db()
         print('Database initialized: battle_data.sqlite3')
     elif args.command == 'seed-heroes':
@@ -70,7 +80,21 @@ def main():
             label = reading.name if reading.accepted else 'UNKNOWN'
             print(f'{slot}: {label} join_value={reading.join_value} match_confidence={reading.match_confidence:.3f} value_confidence={reading.value_confidence:.3f}')
     elif args.command == 'process-battle':
-        key=process_battle(args.outcome,args.heroes,args.ratios_bonuses,notes=args.notes)
+        if args.folder:
+            images = resolve_battle_images(args.folder)
+            outcome_image = images['outcome']
+            heroes_image = images['heroes']
+            ratios_bonuses_image = images['ratios_bonuses']
+            print(f'Auto-routed outcome: {outcome_image}')
+            print(f'Auto-routed heroes: {heroes_image}')
+            print(f'Auto-routed ratios_bonuses: {ratios_bonuses_image}')
+        else:
+            if not args.heroes or not args.ratios_bonuses:
+                parser.error('explicit mode requires --outcome, --heroes, and --ratios-bonuses')
+            outcome_image = args.outcome
+            heroes_image = args.heroes
+            ratios_bonuses_image = args.ratios_bonuses
+        key=process_battle(outcome_image,heroes_image,ratios_bonuses_image,notes=args.notes)
         print(f'Battle saved: {key}')
     elif args.command == 'add-joiner':
         slot,name=add_joiner(args.battle_key,args.side,args.hero)
