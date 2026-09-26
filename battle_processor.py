@@ -88,3 +88,51 @@ def load_battle(battle_key,db_path=None):
             'heroes':conn.execute('''SELECT bh.side,bh.role,bh.slot,h.name,bh.join_value FROM battle_heroes bh JOIN heroes h USING(hero_id)
                 WHERE bh.battle_id=? ORDER BY bh.side,bh.role,bh.slot''',(bid,)).fetchall(),
         }
+
+
+def add_joiner(battle_key, side, hero_name, db_path=None):
+    """Manually attach a joining hero to an existing battle."""
+    if side not in SIDES:
+        raise ValueError(f'Invalid side: {side}')
+    db.init_db(db_path); db.seed_heroes(db_path)
+    with closing(db.connect(db_path)) as conn:
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            battle=conn.execute('SELECT battle_id FROM battles WHERE battle_key=?',(battle_key,)).fetchone()
+            if not battle:
+                raise KeyError(f'Battle not found: {battle_key}')
+            hero=conn.execute('SELECT hero_id,name FROM heroes WHERE name=? COLLATE NOCASE',(hero_name,)).fetchone()
+            if not hero:
+                raise ValueError(f'Unknown hero: {hero_name}')
+            bid=battle[0]
+            duplicate=conn.execute('''SELECT 1 FROM battle_heroes WHERE battle_id=? AND side=? AND role='joiner' AND hero_id=?''',(bid,side,hero[0])).fetchone()
+            if duplicate:
+                raise ValueError(f'{hero[1]} is already a {side} joiner for {battle_key}')
+            slot=conn.execute("SELECT COALESCE(MAX(slot),0)+1 FROM battle_heroes WHERE battle_id=? AND side=? AND role='joiner'",(bid,side)).fetchone()[0]
+            conn.execute('''INSERT INTO battle_heroes
+                (battle_id,side,role,slot,hero_id,join_value,match_confidence,ocr_confidence)
+                VALUES (?,?,?,?,?,NULL,NULL,NULL)''',(bid,side,'joiner',slot,hero[0]))
+            conn.commit()
+            return slot,hero[1]
+        except BaseException:
+            conn.rollback(); raise
+
+
+def remove_joiner(battle_key, side, slot, db_path=None):
+    """Remove one manually entered joiner; lead heroes can never be removed here."""
+    if side not in SIDES:
+        raise ValueError(f'Invalid side: {side}')
+    with closing(db.connect(db_path)) as conn:
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            battle=conn.execute('SELECT battle_id FROM battles WHERE battle_key=?',(battle_key,)).fetchone()
+            if not battle:
+                raise KeyError(f'Battle not found: {battle_key}')
+            row=conn.execute('''SELECT h.name FROM battle_heroes bh JOIN heroes h USING(hero_id)
+                WHERE bh.battle_id=? AND bh.side=? AND bh.role='joiner' AND bh.slot=?''',(battle[0],side,slot)).fetchone()
+            if not row:
+                raise KeyError(f'Joiner not found: {battle_key} {side}.joiner{slot}')
+            conn.execute("DELETE FROM battle_heroes WHERE battle_id=? AND side=? AND role='joiner' AND slot=?",(battle[0],side,slot))
+            conn.commit(); return row[0]
+        except BaseException:
+            conn.rollback(); raise

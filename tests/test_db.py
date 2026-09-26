@@ -32,14 +32,14 @@ class DatabaseTests(unittest.TestCase):
             migrations = conn.execute(
                 'SELECT version FROM schema_migrations ORDER BY version'
             ).fetchall()
-            self.assertEqual(migrations, [('001_initial_schema.sql',), ('002_battle_relationship_model.sql',)])
+            self.assertEqual(migrations, [('001_initial_schema.sql',), ('002_battle_relationship_model.sql',), ('003_hero_role_value_contract.sql',)])
 
     def test_init_is_idempotent(self):
         db.init_db(self.db_path)
         db.init_db(self.db_path)
         with closing(db.connect(self.db_path)) as conn:
             count = conn.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0]
-            self.assertEqual(count, 2)
+            self.assertEqual(count, 3)
 
     def test_seed_loads_22_heroes_and_is_idempotent(self):
         db.init_db(self.db_path)

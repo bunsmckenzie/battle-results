@@ -97,3 +97,15 @@ python app.py read-hero-values --image tests/fixtures/herocomparison.jpg
 ```
 
 Only integer values from 0 through 10 are valid. The current real fixture contains six +10 values, so +10 is positively recognized with OpenCV glyph geometry and no Paddle dependency. Unvalidated single-digit glyphs (0–9) are rejected as UNKNOWN rather than guessed; add labeled real screenshots for those values as they become available.
+
+## Step 8: Manual joining heroes
+
+Joining heroes are attached to an existing battle without changing its lead heroes or extracted battle data.
+
+```bash
+python app.py add-joiner B000001 --side attacker --hero "Charles" --value 8
+python app.py show-battle B000001
+python app.py remove-joiner B000001 --side attacker --slot 1
+```
+
+Join values must be integers from 0 through 10. Hero names are validated against the seeded hero catalog. Joiner slots are assigned independently for attacker and defender.

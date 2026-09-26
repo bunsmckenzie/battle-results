@@ -6,7 +6,7 @@ from hero_values import extract_battle_join_values
 from battle_heroes import analyze_battle_heroes
 from outcome_reader import extract_battle_outcome
 from percent_reader import extract_ratios_bonuses
-from battle_processor import process_battle, load_battle
+from battle_processor import process_battle, load_battle, add_joiner, remove_joiner
 
 
 def main():
@@ -35,6 +35,14 @@ def main():
     process.add_argument('--notes')
     show = sub.add_parser('show-battle')
     show.add_argument('battle_key')
+    addj = sub.add_parser('add-joiner')
+    addj.add_argument('battle_key')
+    addj.add_argument('--side', required=True, choices=('attacker','defender'))
+    addj.add_argument('--hero', required=True)
+    remj = sub.add_parser('remove-joiner')
+    remj.add_argument('battle_key')
+    remj.add_argument('--side', required=True, choices=('attacker','defender'))
+    remj.add_argument('--slot', required=True, type=int)
     args = parser.parse_args()
     if args.command == 'init-db':
         db.init_db()
@@ -64,6 +72,12 @@ def main():
     elif args.command == 'process-battle':
         key=process_battle(args.outcome,args.heroes,args.ratios_bonuses,notes=args.notes)
         print(f'Battle saved: {key}')
+    elif args.command == 'add-joiner':
+        slot,name=add_joiner(args.battle_key,args.side,args.hero)
+        print(f'Joiner added: {args.battle_key} {args.side}.joiner{slot}: {name}')
+    elif args.command == 'remove-joiner':
+        name=remove_joiner(args.battle_key,args.side,args.slot)
+        print(f'Joiner removed: {args.battle_key} {args.side}.joiner{args.slot}: {name}')
     elif args.command == 'show-battle':
         b=load_battle(args.battle_key)
         print(f'Battle {b["battle"][1]} created={b["battle"][2]}')
@@ -74,7 +88,9 @@ def main():
         print('BONUSES')
         for side,troop,stat,value in b['bonuses']: print(f'  {side}.{troop}_{stat}: +{value:.1f}%')
         print('HEROES')
-        for side,role,slot,name,value in b['heroes']: print(f'  {side}.{role}{slot}: {name} join_value={value}')
+        for side,role,slot,name,value in b['heroes']:
+            suffix = f' join_value={value}' if role == 'lead' else ''
+            print(f'  {side}.{role}{slot}: {name}{suffix}')
     elif args.command == 'match-heroes':
         for slot, match in match_battle_heroes(args.image).items():
             label = match.name if match.accepted else 'UNKNOWN'
