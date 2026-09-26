@@ -18,3 +18,8 @@ INSERT OR IGNORE INTO heroes (hero_id, name, generation, troop_type) VALUES
 (17, 'Amadeus', 1, 'infantry'),
 (18, 'Helga', 1, 'infantry'),
 (19, 'Saul', 1, 'archer');
+
+INSERT OR IGNORE INTO heroes (hero_id, name, generation, troop_type) VALUES
+(20, 'Ava', 7, 'cavalry'),
+(21, 'Charles', 7, 'infantry'),
+(22, 'Wee & Woo', 7, 'archer');

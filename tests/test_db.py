@@ -41,12 +41,12 @@ class DatabaseTests(unittest.TestCase):
             count = conn.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0]
             self.assertEqual(count, 1)
 
-    def test_seed_loads_19_heroes_and_is_idempotent(self):
+    def test_seed_loads_22_heroes_and_is_idempotent(self):
         db.init_db(self.db_path)
         db.seed_heroes(self.db_path)
         db.seed_heroes(self.db_path)
         with closing(db.connect(self.db_path)) as conn:
-            self.assertEqual(conn.execute('SELECT COUNT(*) FROM heroes').fetchone()[0], 19)
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM heroes').fetchone()[0], 22)
             self.assertEqual(
                 conn.execute('SELECT name FROM heroes WHERE hero_id = 1').fetchone()[0],
                 'Yang',
@@ -73,7 +73,7 @@ class DatabaseTests(unittest.TestCase):
         db.init_db(self.db_path)
         db.seed_heroes(self.db_path)
         with closing(db.connect(self.db_path)) as conn:
-            self.assertEqual(conn.execute('SELECT COUNT(*) FROM heroes').fetchone()[0], 19)
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM heroes').fetchone()[0], 22)
         # On Windows an open SQLite connection prevents this unlink operation.
         self.db_path.unlink()
         self.assertFalse(self.db_path.exists())

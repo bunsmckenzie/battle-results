@@ -15,19 +15,62 @@ from layout import BASE_DIR, LayoutCatalog, load_image
 
 DEFAULT_LOOKUP = BASE_DIR / "assets" / "heroes" / "hero_lookup.png"
 
-# Pixel boxes for the portrait artwork in the current 1300x3350 lookup asset.
-# They are converted to normalized coordinates at load time, so a proportionally
-# resized copy of the lookup image remains usable.
-_REFERENCE_SIZE = (1300, 3350)
-_REFERENCE_BOXES = {
-    "Yang": (52, 127, 286, 337), "Triton": (376, 127, 609, 337), "Sophia": (700, 127, 934, 337),
-    "Vivian": (52, 693, 286, 900), "Long Fei": (376, 693, 609, 900), "Thrud": (700, 693, 934, 900),
-    "Rosa": (52, 1229, 286, 1441), "Alcar": (376, 1229, 609, 1441), "Margot": (700, 1229, 934, 1441),
-    "Jaeger": (52, 1800, 286, 2009), "Eric": (376, 1800, 609, 2009), "Petra": (700, 1800, 934, 2009),
-    "Hilde": (35, 2365, 269, 2570), "Zoe": (357, 2365, 590, 2570), "Marlin": (680, 2365, 914, 2570),
-    "Jabel": (35, 2915, 269, 3125), "Amadeus": (357, 2915, 590, 3125), "Helga": (680, 2915, 914, 3125),
-    "Saul": (1005, 2915, 1238, 3125),
-}
+# Hero names in visual order in the lookup image. Card positions are detected
+# from the image itself rather than tied to one lookup image height.
+_REFERENCE_NAMES = (
+    "Ava", "Charles", "Wee & Woo",
+    "Yang", "Triton", "Sophia",
+    "Vivian", "Long Fei", "Thrud",
+    "Rosa", "Alcar", "Margot",
+    "Jaeger", "Eric", "Petra",
+    "Hilde", "Zoe", "Marlin",
+    "Jabel", "Amadeus", "Helga", "Saul",
+)
+
+def _detect_reference_boxes(lookup: np.ndarray) -> list[tuple[int, int, int, int]]:
+    """Detect the portrait grid and return boxes in visual reading order.
+
+    Canny edges locate the repeated portrait frames. Their Y positions establish
+    generation rows; portrait columns are proportional to image width. This also
+    recovers a card when one portrait's artwork does not yield a clean contour.
+    """
+    gray = cv2.cvtColor(lookup, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 80, 160)
+    contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    h, w = lookup.shape[:2]
+    candidates = []
+    for contour in contours:
+        x, y, bw, bh = cv2.boundingRect(contour)
+        if 0.18 * w <= bw <= 0.22 * w and 0.045 * h <= bh <= 0.060 * h:
+            candidates.append((x, y, bw, bh))
+    if not candidates:
+        raise ValueError("Could not detect hero portrait rows in lookup image")
+
+    ys = sorted(y for _, y, _, _ in candidates)
+    rows: list[list[int]] = []
+    row_gap = max(50, round(0.016 * h))
+    for y in ys:
+        if not rows or y - rows[-1][-1] > row_gap:
+            rows.append([y])
+        else:
+            rows[-1].append(y)
+    if len(rows) != 7:
+        raise ValueError(f"Expected 7 hero generations in lookup image; detected {len(rows)}")
+
+    row_tops = [round(sum(row) / len(row)) for row in rows]
+    centers = (0.135, 0.385, 0.635)
+    portrait_w, portrait_h = round(0.177 * w), round(0.044 * h)
+    y_inset = round(0.0032 * h)
+    boxes = []
+    for row_index, y in enumerate(row_tops):
+        row_centers = centers + ((0.885,) if row_index == len(row_tops) - 1 else ())
+        for center in row_centers:
+            x1 = round(center * w - portrait_w / 2)
+            y1 = y + y_inset
+            boxes.append((x1, y1, x1 + portrait_w, y1 + portrait_h))
+    if len(boxes) != len(_REFERENCE_NAMES):
+        raise ValueError(f"Detected {len(boxes)} reference portraits but catalog has {len(_REFERENCE_NAMES)} heroes")
+    return boxes
 
 @dataclass(frozen=True)
 class Candidate:
@@ -57,13 +100,10 @@ class HeroMatcher:
         self.references = self._build_references(lookup)
 
     def _build_references(self, lookup: np.ndarray):
-        h, w = lookup.shape[:2]
-        rw, rh = _REFERENCE_SIZE
         refs = {}
-        for name, (x1, y1, x2, y2) in _REFERENCE_BOXES.items():
-            px1, px2 = round(x1 / rw * w), round(x2 / rw * w)
-            py1, py2 = round(y1 / rh * h), round(y2 / rh * h)
-            crop = lookup[py1:py2, px1:px2]
+        boxes = _detect_reference_boxes(lookup)
+        for name, (x1, y1, x2, y2) in zip(_REFERENCE_NAMES, boxes):
+            crop = lookup[y1:y2, x1:x2]
             gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
             _, descriptors = self.sift.detectAndCompute(gray, None)
             refs[name] = descriptors

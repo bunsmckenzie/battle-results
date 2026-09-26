@@ -14,22 +14,24 @@ class HeroMatcherTests(unittest.TestCase):
     def test_all_six_slots_are_returned(self):
         self.assertEqual(len(self.results), 6)
 
-    def test_yang_is_strongly_matched(self):
-        match = self.results["attacker.hero3"]
-        self.assertTrue(match.accepted)
-        self.assertEqual(match.name, "Yang")
-        self.assertGreaterEqual(match.good_matches, 10)
+    def test_all_six_fixture_heroes_are_strongly_matched(self):
+        expected = {
+            "attacker.hero1": "Charles",
+            "attacker.hero2": "Ava",
+            "attacker.hero3": "Yang",
+            "defender.hero1": "Charles",
+            "defender.hero2": "Sophia",
+            "defender.hero3": "Wee & Woo",
+        }
+        for slot, name in expected.items():
+            match = self.results[slot]
+            self.assertTrue(match.accepted, slot)
+            self.assertEqual(match.name, name)
+            self.assertGreaterEqual(match.good_matches, 10)
 
-    def test_sophia_is_strongly_matched(self):
-        match = self.results["defender.hero2"]
-        self.assertTrue(match.accepted)
-        self.assertEqual(match.name, "Sophia")
-        self.assertGreaterEqual(match.good_matches, 10)
-
-    def test_alternate_artwork_is_not_forced_to_a_name(self):
-        for slot in ("attacker.hero1", "attacker.hero2", "defender.hero1", "defender.hero3"):
-            self.assertFalse(self.results[slot].accepted, slot)
-            self.assertIsNone(self.results[slot].name)
+    def test_lookup_contains_22_detected_references(self):
+        matcher = HeroMatcher()
+        self.assertEqual(len(matcher.references), 22)
 
     def test_ranked_candidates_are_available_for_review(self):
         match = self.results["attacker.hero1"]
