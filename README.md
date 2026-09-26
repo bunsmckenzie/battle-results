@@ -54,3 +54,23 @@ The intended transaction flow is:
 image → fixed regions → OCR/image matching → normalization → validation → SQLite transaction
 
 A failed validation must not create a partial battle record.
+
+## Step 2: screenshot geometry
+
+`config/layout.json` contains normalized (resolution-independent) regions for the three
+current screenshot types.  `layout.py` converts those regions to pixel crops.  This
+stage intentionally performs no OCR.
+
+Visually inspect any layout with:
+
+```bash
+python app.py debug-layout --type hero_comparison --image tests/fixtures/herocomparison.jpg --out debug_crops/heroes
+python app.py debug-layout --type outcome --image tests/fixtures/outcome.jpg --out debug_crops/outcome
+python app.py debug-layout --type ratios_bonuses --image tests/fixtures/ratiosbonuses.jpg --out debug_crops/ratiosbonuses
+```
+
+Run all tests with:
+
+```bash
+python -m unittest discover -s tests -v
+```
