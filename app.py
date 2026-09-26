@@ -72,7 +72,7 @@ def main():
     elif args.command == 'read-ratios-bonuses':
         result = extract_ratios_bonuses(args.image)
         for slot, item in result['ratios'].items():
-            r=item['reading']; print(f"{slot}: {item['troop_type']} {r.value:.2f}% confidence={r.confidence:.3f}")
+            r=item['reading']; tl=item['troop_level']; tg=item['tg_level']; print(f"{slot}: {item['troop_type']} {r.value:.2f}% troop_level={tl.value:.1f} tg_level={tg.value} confidence={r.confidence:.3f}")
         for field, r in result['bonuses'].items():
             print(f'{field}: +{r.value:.1f}% confidence={r.confidence:.3f}')
     elif args.command == 'analyze-heroes':
@@ -108,7 +108,9 @@ def main():
         print('OUTCOMES')
         for r in b['outcomes']: print('  '+ ' | '.join(map(str,r)))
         print('RATIOS')
-        for side,troop,ratio,present in b['ratios']: print(f'  {side}.{troop}: {ratio:.2f}% present={present}')
+        for side,troop,ratio,present,troop_level,tg_level in b['ratios']:
+            levels = f' troop_level={troop_level:.1f} tg_level={tg_level}' if present else ' troop_level=NULL tg_level=NULL'
+            print(f'  {side}.{troop}: {ratio:.2f}% present={present}{levels}')
         print('BONUSES')
         for side,troop,stat,value in b['bonuses']: print(f'  {side}.{troop}_{stat}: +{value:.1f}%')
         print('HEROES')

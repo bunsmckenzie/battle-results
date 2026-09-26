@@ -10,6 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from layout import load_image
+from troop_level_reader import TroopLevelRecognizer, card_centers, level_glyphs, tg_glyph
 
 BONUS_LABELS=(
     'infantry_attack','infantry_defense','infantry_lethality','infantry_health',
@@ -108,15 +109,18 @@ class PercentDigitRecognizer:
         pairs=[self._digit(g,True) for g in glyphs]; s=''.join(str(d) for d,_ in pairs)
         return PercentReading(float(s[:-2]+'.'+s[-2:]),round(min(c for _,c in pairs),3))
 
-def extract_ratios_bonuses(image_path:Path|str,recognizer:PercentDigitRecognizer|None=None):
-    image=load_image(image_path); rec=recognizer or PercentDigitRecognizer(); rows=_bonus_row_centers(image); w=image.shape[1]
+def extract_ratios_bonuses(image_path:Path|str,recognizer:PercentDigitRecognizer|None=None,level_recognizer:TroopLevelRecognizer|None=None):
+    image=load_image(image_path); rec=recognizer or PercentDigitRecognizer(); level_rec=level_recognizer or TroopLevelRecognizer(); rows=_bonus_row_centers(image); w=image.shape[1]
     bonuses={}
     for side,xmin,xmax in (('attacker',0.11*w,0.34*w),('defender',0.60*w,0.94*w)):
         for label,cy in zip(BONUS_LABELS,rows): bonuses[f'{side}.{label}']=rec.bonus(_bonus_glyphs(image,cy,xmin,xmax))
     ratio_groups=_ratio_groups(image,rows[0]-202); ratios={}
     for side,groups in zip(('attacker','defender'),ratio_groups):
         if not 1<=len(groups)<=3: raise ValueError(f'Expected 1-3 {side} ratio slots; detected {len(groups)}')
-        for i,glyphs in enumerate(groups):
+        centers=card_centers(side,len(groups),w); level_baseline=rows[0]-242
+        for i,(glyphs,center) in enumerate(zip(groups,centers)):
             key=f'{side}.ratio.slot{i+1}'
-            ratios[key]={'troop_type':TROOP_ORDER[i],'reading':rec.ratio(glyphs)}
+            ratios[key]={'troop_type':TROOP_ORDER[i],'reading':rec.ratio(glyphs),
+                         'troop_level':level_rec.troop_level(level_glyphs(image,center,level_baseline)),
+                         'tg_level':level_rec.tg_level(tg_glyph(image,center,level_baseline))}
     return {'ratios':ratios,'bonuses':bonuses}

@@ -23,11 +23,13 @@ def normalize_ratios(extracted):
     rows=[]
     for key,item in extracted.items():
         side=key.split('.',1)[0]
-        found[(side,item['troop_type'])]=item['reading']
+        found[(side,item['troop_type'])]=item
     for side in SIDES:
         for troop in TROOP_ORDER:
-            reading=found.get((side,troop))
-            rows.append((side,troop,reading.value if reading else 0.0,1 if reading else 0,reading.confidence if reading else None))
+            item=found.get((side,troop))
+            reading=item['reading'] if item else None
+            rows.append((side,troop,reading.value if reading else 0.0,1 if item else 0,reading.confidence if reading else None,
+                         item['troop_level'].value if item else None,item['tg_level'].value if item else None))
     return rows
 
 
@@ -57,8 +59,10 @@ def process_battle(outcome_image, heroes_image, ratios_bonuses_image, db_path=No
                 conn.execute('''INSERT INTO battle_outcomes
                     (battle_id,side,power,squad,losses,injured,lightly_injured,residents)
                     VALUES (?,?,?,?,?,?,?,?)''',(battle_id,side,*vals))
-            for side,troop,ratio,present,conf in data['ratios']:
-                conn.execute('INSERT INTO troop_ratios VALUES (?,?,?,?,?,?)',(battle_id,side,troop,ratio,present,conf))
+            for side,troop,ratio,present,conf,troop_level,tg_level in data['ratios']:
+                conn.execute('''INSERT INTO troop_ratios
+                    (battle_id,side,troop_type,ratio,was_present,confidence,troop_level,tg_level) VALUES (?,?,?,?,?,?,?,?)''',
+                    (battle_id,side,troop,ratio,present,conf,troop_level,tg_level))
             for key,r in data['bonuses'].items():
                 side,rest=key.split('.',1); troop,stat=rest.rsplit('_',1)
                 conn.execute('INSERT INTO troop_bonuses VALUES (?,?,?,?,?,?)',(battle_id,side,troop,stat,r.value,r.confidence))
@@ -83,7 +87,7 @@ def load_battle(battle_key,db_path=None):
         return {
             'battle':row,
             'outcomes':conn.execute('SELECT side,power,squad,losses,injured,lightly_injured,residents FROM battle_outcomes WHERE battle_id=? ORDER BY side',(bid,)).fetchall(),
-            'ratios':conn.execute('SELECT side,troop_type,ratio,was_present FROM troop_ratios WHERE battle_id=? ORDER BY side, CASE troop_type WHEN "infantry" THEN 1 WHEN "cavalry" THEN 2 ELSE 3 END',(bid,)).fetchall(),
+            'ratios':conn.execute('SELECT side,troop_type,ratio,was_present,troop_level,tg_level FROM troop_ratios WHERE battle_id=? ORDER BY side, CASE troop_type WHEN "infantry" THEN 1 WHEN "cavalry" THEN 2 ELSE 3 END',(bid,)).fetchall(),
             'bonuses':conn.execute('SELECT side,troop_type,stat,value FROM troop_bonuses WHERE battle_id=? ORDER BY side,troop_type,stat',(bid,)).fetchall(),
             'heroes':conn.execute('''SELECT bh.side,bh.role,bh.slot,h.name,bh.join_value FROM battle_heroes bh JOIN heroes h USING(hero_id)
                 WHERE bh.battle_id=? ORDER BY bh.side,bh.role,bh.slot''',(bid,)).fetchall(),

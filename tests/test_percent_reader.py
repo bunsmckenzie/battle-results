@@ -29,4 +29,19 @@ class PercentReaderTests(unittest.TestCase):
  def test_each_fixture_has_24_bonuses(self):
   for fn in EXPECTED:
    self.assertEqual(len(extract_ratios_bonuses(ROOT/'tests/fixtures'/fn)['bonuses']),24)
+
+ def test_troop_and_tg_levels_all_fixtures(self):
+  expected={
+   'ratiosbonuses.jpg':([10.9,10.8,10.9],[7,7,7],[10.7,10.5],[7,7]),
+   'ratiosbonuses2.jpg':([10.4,10.3,10.5],[7,7,7],[10.7,10.2,10.7],[7,7,7]),
+   'ratiosbonuses3.jpg':([11.0,10.8,11.0],[8,8,8],[10.8,10.7],[7,7]),
+  }
+  for fn,(al,at,dl,dt) in expected.items():
+   with self.subTest(fn=fn):
+    r=extract_ratios_bonuses(ROOT/'tests/fixtures'/fn)['ratios']
+    a=[v for k,v in r.items() if k.startswith('attacker.')]
+    d=[v for k,v in r.items() if k.startswith('defender.')]
+    self.assertEqual([v['troop_level'].value for v in a],al); self.assertEqual([v['tg_level'].value for v in a],at)
+    self.assertEqual([v['troop_level'].value for v in d],dl); self.assertEqual([v['tg_level'].value for v in d],dt)
+
 if __name__=='__main__': unittest.main()
