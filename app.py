@@ -4,6 +4,7 @@ from layout import LayoutCatalog, write_debug_crops
 from hero_matcher import match_battle_heroes
 from hero_values import extract_battle_join_values
 from battle_heroes import analyze_battle_heroes
+from outcome_reader import extract_battle_outcome
 
 
 def main():
@@ -19,6 +20,8 @@ def main():
     heroes.add_argument('--image', required=True)
     values = sub.add_parser('read-hero-values')
     values.add_argument('--image', required=True)
+    outcome = sub.add_parser('read-outcome')
+    outcome.add_argument('--image', required=True)
     combined = sub.add_parser('analyze-heroes')
     combined.add_argument('--image', required=True)
     args = parser.parse_args()
@@ -34,6 +37,9 @@ def main():
     elif args.command == 'read-hero-values':
         for slot, reading in extract_battle_join_values(args.image).items():
             print(f'{slot}: {reading.value} confidence={reading.confidence:.3f} raw={reading.raw_text!r}')
+    elif args.command == 'read-outcome':
+        for field, reading in extract_battle_outcome(args.image).items():
+            print(f'{field}: {reading.value:,} confidence={reading.confidence:.3f}')
     elif args.command == 'analyze-heroes':
         for slot, reading in analyze_battle_heroes(args.image).items():
             label = reading.name if reading.accepted else 'UNKNOWN'
