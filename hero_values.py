@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from layout import LayoutCatalog, load_image
-from ocr import NumericOCR
+from join_value_recognizer import ConstrainedJoinValueRecognizer
 
 MIN_JOIN_VALUE = 0
 MAX_JOIN_VALUE = 10
@@ -25,10 +25,10 @@ def validate_join_value(value: int) -> int:
     return value
 
 
-def extract_battle_join_values(image_path: Path | str, ocr: NumericOCR | None = None) -> dict[str, JoinValueReading]:
+def extract_battle_join_values(image_path: Path | str, ocr=None) -> dict[str, JoinValueReading]:
     image = load_image(image_path)
     catalog = LayoutCatalog.load()
-    ocr = ocr or NumericOCR()
+    ocr = ocr or ConstrainedJoinValueRecognizer()
     readings = {}
     for region_name in catalog.regions("hero_comparison"):
         if not region_name.endswith(".join_value"):

@@ -6,7 +6,7 @@ Domains:
 - Outcome: Power, Squad, Losses, Injured, Lightly Injured, Residents
 - Troop ratios: Infantry, Cavalry, Archer
 - Bonuses: Infantry/Cavalry/Archer × Attack/Defense/Lethality/Health
-- Heroes: 19-hero reference catalog plus battle hero join value (0–10)
+- Heroes: 22-hero reference catalog plus battle hero join value (0–10)
 
 The pipeline is deliberately split into image extraction, validation, and database insertion. The screenshot coordinates are configuration-driven so we can calibrate them against your final cleaned crops.
 
@@ -21,14 +21,11 @@ python -m venv .venv
 # macOS/Linux
 # source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install opencv-python numpy paddleocr
+python -m pip install -r requirements.txt
 ```
 
-Install the appropriate PaddlePaddle CPU/GPU runtime for your machine using the official instructions:
-https://www.paddlepaddle.org.cn/install/quick
 
-PaddleOCR installation documentation:
-https://www.paddleocr.ai/main/en/version3.x/installation.html
+PaddleOCR is not required for the validated hero matching/join-value path.
 
 ## Initialize database
 
@@ -37,7 +34,7 @@ python app.py init-db
 python app.py seed-heroes
 ```
 
-This creates `battle_data.sqlite3` and loads the 19 known heroes. Database schema changes live in `migrations/` and are recorded in `schema_migrations`, so initialization is safe to run repeatedly.
+This creates `battle_data.sqlite3` and loads the 22 known heroes. Database schema changes live in `migrations/` and are recorded in `schema_migrations`, so initialization is safe to run repeatedly.
 
 ## Run database tests
 
@@ -91,7 +88,7 @@ Run all tests with:
 python -m unittest discover -s tests -v
 ```
 
-## Step 4: hero join-value OCR
+## Step 4.1: constrained hero join-value recognition
 
 Read only the top-most adjacent equipment value for each of the six battle heroes:
 
@@ -99,4 +96,4 @@ Read only the top-most adjacent equipment value for each of the six battle heroe
 python app.py read-hero-values --image tests/fixtures/herocomparison.jpg
 ```
 
-Only integer values from 0 through 10 are accepted. OCR text and recognition confidence are retained for review; out-of-range values fail validation instead of being silently stored.
+Only integer values from 0 through 10 are valid. The current real fixture contains six +10 values, so +10 is positively recognized with OpenCV glyph geometry and no Paddle dependency. Unvalidated single-digit glyphs (0–9) are rejected as UNKNOWN rather than guessed; add labeled real screenshots for those values as they become available.

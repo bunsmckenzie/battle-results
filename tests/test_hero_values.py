@@ -1,8 +1,10 @@
 import unittest
+import numpy as np
 from pathlib import Path
 
 from hero_values import extract_battle_join_values, validate_join_value
 from ocr import NumericOCR, OCRReading
+from join_value_recognizer import ConstrainedJoinValueRecognizer
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -53,6 +55,18 @@ class HeroValueTests(unittest.TestCase):
             "defender.hero2", "attacker.hero3", "defender.hero3",
         })
         self.assertEqual(sorted(r.value for r in readings.values()), [5,6,7,8,9,10])
+
+    def test_real_fixture_recognizes_all_six_as_ten_without_paddle(self):
+        readings = extract_battle_join_values(FIXTURES / "herocomparison.jpg")
+        self.assertEqual(len(readings), 6)
+        self.assertTrue(all(r.value == 10 for r in readings.values()))
+        self.assertTrue(all(r.raw_text == "+10" for r in readings.values()))
+        self.assertTrue(all(r.confidence >= 0.70 for r in readings.values()))
+
+    def test_constrained_recognizer_rejects_unrecognized_image(self):
+        blank = np.zeros((88, 103, 3), dtype=np.uint8)
+        with self.assertRaisesRegex(ValueError, "UNKNOWN hero join value"):
+            ConstrainedJoinValueRecognizer().read_image(blank)
 
     def test_out_of_range_ocr_is_rejected_not_stored(self):
         with self.assertRaisesRegex(ValueError, "between 0 and 10"):
