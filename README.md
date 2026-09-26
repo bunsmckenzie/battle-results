@@ -37,7 +37,13 @@ python app.py init-db
 python app.py seed-heroes
 ```
 
-This creates `battle_data.sqlite3` and loads the 19 known heroes.
+This creates `battle_data.sqlite3` and loads the 19 known heroes. Database schema changes live in `migrations/` and are recorded in `schema_migrations`, so initialization is safe to run repeatedly.
+
+## Run database tests
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ## Next calibration step
 
