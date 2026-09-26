@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -16,7 +17,7 @@ class DatabaseTests(unittest.TestCase):
 
     def test_init_creates_expected_schema_and_records_migration(self):
         db.init_db(self.db_path)
-        with db.connect(self.db_path) as conn:
+        with closing(db.connect(self.db_path)) as conn:
             tables = {
                 row[0]
                 for row in conn.execute(
@@ -36,7 +37,7 @@ class DatabaseTests(unittest.TestCase):
     def test_init_is_idempotent(self):
         db.init_db(self.db_path)
         db.init_db(self.db_path)
-        with db.connect(self.db_path) as conn:
+        with closing(db.connect(self.db_path)) as conn:
             count = conn.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0]
             self.assertEqual(count, 1)
 
@@ -44,7 +45,7 @@ class DatabaseTests(unittest.TestCase):
         db.init_db(self.db_path)
         db.seed_heroes(self.db_path)
         db.seed_heroes(self.db_path)
-        with db.connect(self.db_path) as conn:
+        with closing(db.connect(self.db_path)) as conn:
             self.assertEqual(conn.execute('SELECT COUNT(*) FROM heroes').fetchone()[0], 19)
             self.assertEqual(
                 conn.execute('SELECT name FROM heroes WHERE hero_id = 1').fetchone()[0],
@@ -54,7 +55,7 @@ class DatabaseTests(unittest.TestCase):
     def test_foreign_keys_and_join_value_constraint_are_enforced(self):
         db.init_db(self.db_path)
         db.seed_heroes(self.db_path)
-        with db.connect(self.db_path) as conn:
+        with closing(db.connect(self.db_path)) as conn:
             conn.execute("INSERT INTO battles(source_image) VALUES ('fixture.jpg')")
             battle_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
             with self.assertRaises(sqlite3.IntegrityError):
@@ -67,6 +68,15 @@ class DatabaseTests(unittest.TestCase):
                     'INSERT INTO battle_heroes(battle_id, slot, hero_id, join_value) VALUES (?, 1, 1, 11)',
                     (battle_id,),
                 )
+
+    def test_connections_close_before_database_file_removal(self):
+        db.init_db(self.db_path)
+        db.seed_heroes(self.db_path)
+        with closing(db.connect(self.db_path)) as conn:
+            self.assertEqual(conn.execute('SELECT COUNT(*) FROM heroes').fetchone()[0], 19)
+        # On Windows an open SQLite connection prevents this unlink operation.
+        self.db_path.unlink()
+        self.assertFalse(self.db_path.exists())
 
     def test_seed_before_init_has_clear_error(self):
         with self.assertRaisesRegex(RuntimeError, 'not initialized'):

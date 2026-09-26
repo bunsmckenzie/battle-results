@@ -1,4 +1,5 @@
 from pathlib import Path
+from contextlib import closing
 import sqlite3
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -10,7 +11,11 @@ HEROES_SEED_PATH = BASE_DIR / 'heroes_seed.sql'
 def connect(db_path=None):
     path = Path(db_path) if db_path is not None else DB_PATH
     conn = sqlite3.connect(path)
-    conn.execute('PRAGMA foreign_keys = ON')
+    try:
+        conn.execute('PRAGMA foreign_keys = ON')
+    except BaseException:
+        conn.close()
+        raise
     return conn
 
 
@@ -24,8 +29,7 @@ def _migration_files():
 
 
 def init_db(db_path=None):
-    conn = connect(db_path)
-    try:
+    with closing(connect(db_path)) as conn:
         # Bootstrap only the migration ledger; all application tables belong in migrations.
         conn.execute('''
             CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -47,15 +51,12 @@ def init_db(db_path=None):
                     'INSERT INTO schema_migrations(version) VALUES (?)',
                     (version,),
                 )
-    finally:
-        conn.close()
 
 
 def seed_heroes(db_path=None):
     if not HEROES_SEED_PATH.is_file():
         raise FileNotFoundError(f'Hero seed file not found: {HEROES_SEED_PATH}')
-    conn = connect(db_path)
-    try:
+    with closing(connect(db_path)) as conn:
         # Give a clearer error than SQLite's generic "no such table" message.
         exists = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='heroes'"
@@ -64,5 +65,3 @@ def seed_heroes(db_path=None):
             raise RuntimeError('Database is not initialized. Run `python app.py init-db` first.')
         with conn:
             conn.executescript(HEROES_SEED_PATH.read_text(encoding='utf-8'))
-    finally:
-        conn.close()
