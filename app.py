@@ -110,6 +110,7 @@ def main():
         print(f'result: {m.result}')
     elif args.command == 'read-ratios-bonuses':
         result = extract_ratios_bonuses(args.image)
+        print(f"ratio_input_mode: {result['ratio_input_mode']}")
         for slot, item in result['ratios'].items():
             r=item['reading']; tl=item['troop_level']; tg=item['tg_level']; print(f"{slot}: {item['troop_type']} {r.value:.2f}% troop_level={tl.value:.1f} tg_level={tg.value} confidence={r.confidence:.3f}")
         for field, r in result['bonuses'].items():

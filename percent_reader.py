@@ -93,6 +93,15 @@ def _ratio_groups(image,baseline):
     return result
 
 
+def ratios_from_counts(counts):
+    """Convert visible absolute troop counts to percentages, rounded to 2 decimals."""
+    values=[int(v) for v in counts]
+    total=sum(values)
+    if total <= 0:
+        raise ValueError(f'Invalid troop-count total: {total}')
+    return [round(v*100.0/total,2) for v in values]
+
+
 def _count_mode_slots(image, baseline, level_baseline, level_rec):
     """Read troop counts shown under cards and derive per-side percentages.
 
@@ -116,11 +125,8 @@ def _count_mode_slots(image, baseline, level_baseline, level_rec):
             visible.append((center,reading))
         if not 1 <= len(visible) <= 3:
             raise ValueError(f'Expected 1-3 {side} troop-count slots; detected {len(visible)}')
-        total=sum(r.value for _,r in visible)
-        if total <= 0:
-            raise ValueError(f'Invalid {side} troop-count total: {total}')
-        for i,(center,count_reading) in enumerate(visible):
-            ratio=round(count_reading.value*100.0/total,2)
+        ratios=ratios_from_counts([r.value for _,r in visible])
+        for i,((center,count_reading),ratio) in enumerate(zip(visible,ratios)):
             reading=PercentReading(ratio,round(count_reading.confidence,3))
             result[f'{side}.ratio.slot{i+1}']={
                 'troop_type':TROOP_ORDER[i], 'reading':reading,
@@ -156,6 +162,7 @@ def extract_ratios_bonuses(image_path:Path|str,recognizer:PercentDigitRecognizer
     ratio_baseline=rows[0]-202; level_baseline=rows[0]-242
     ratio_groups=_ratio_groups(image,ratio_baseline); ratios={}
     if any(ratio_groups):
+        ratio_input_mode='ratios'
         for side,groups in zip(('attacker','defender'),ratio_groups):
             if not 1<=len(groups)<=3: raise ValueError(f'Expected 1-3 {side} ratio slots; detected {len(groups)}')
             centers=card_centers(side,len(groups),w)
@@ -165,5 +172,6 @@ def extract_ratios_bonuses(image_path:Path|str,recognizer:PercentDigitRecognizer
                              'troop_level':level_rec.troop_level(level_glyphs(image,center,level_baseline)),
                              'tg_level':level_rec.tg_level(tg_glyph(image,center,level_baseline))}
     else:
+        ratio_input_mode='counts'
         ratios=_count_mode_slots(image,ratio_baseline,level_baseline,level_rec)
-    return {'ratios':ratios,'bonuses':bonuses}
+    return {'ratio_input_mode':ratio_input_mode,'ratios':ratios,'bonuses':bonuses}

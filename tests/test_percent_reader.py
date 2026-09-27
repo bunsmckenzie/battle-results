@@ -1,6 +1,6 @@
 import unittest
 from pathlib import Path
-from percent_reader import extract_ratios_bonuses
+from percent_reader import extract_ratios_bonuses, ratios_from_counts
 ROOT=Path(__file__).resolve().parents[1]
 EXPECTED={
  'ratiosbonuses.jpg':([48.93,2.06,49.00],[61.19,38.80]),
@@ -55,5 +55,22 @@ class PercentReaderTests(unittest.TestCase):
   self.assertEqual([v['troop_level'].value for v in d],[10.8,10.6,10.5])
   self.assertEqual([v['tg_level'].value for v in d],[7,7,7])
   self.assertEqual(r['bonuses']['defender.infantry_attack'].value,2438.4)
+
+
+ def test_absolute_counts_are_converted_to_ratios(self):
+  self.assertEqual(ratios_from_counts([778528,31779,778525]),[49.0,2.0,49.0])
+  self.assertEqual(ratios_from_counts([791233,31655,810944]),[48.43,1.94,49.63])
+
+ def test_percentage_view_is_passed_through(self):
+  r=extract_ratios_bonuses(ROOT/'tests/fixtures/ratiosbonuses.jpg')
+  self.assertEqual(r['ratio_input_mode'],'ratios')
+  a=[v['reading'].value for k,v in r['ratios'].items() if k.startswith('attacker.')]
+  self.assertEqual(a,[48.93,2.06,49.0])
+
+ def test_count_view_reports_counts_mode_and_calculated_ratios(self):
+  r=extract_ratios_bonuses(ROOT/'tests/fixtures/full_ratios_counts.jpg')
+  self.assertEqual(r['ratio_input_mode'],'counts')
+  a=[v['reading'].value for k,v in r['ratios'].items() if k.startswith('attacker.')]
+  self.assertEqual(a,[49.0,2.0,49.0])
 
 if __name__=='__main__': unittest.main()
