@@ -73,4 +73,20 @@ class PercentReaderTests(unittest.TestCase):
   a=[v['reading'].value for k,v in r['ratios'].items() if k.startswith('attacker.')]
   self.assertEqual(a,[49.0,2.0,49.0])
 
+
+ def test_additional_fullscreen_count_views_with_two_or_three_defender_cards(self):
+  expected={
+   'new_rb/rb1.jpg':([49.0,2.0,49.0],[48.43,1.94,49.63]),
+   'new_rb/rb2.jpg':([49.0,2.0,49.0],[59.51,40.49]),
+   'new_rb/rb3.jpg':([49.0,2.0,49.0],[50.2,2.3,47.5]),
+   'new_rb/rb4.jpg':([48.93,2.06,49.0],[61.19,38.81]),
+  }
+  for fn,(ae,de) in expected.items():
+   with self.subTest(fn=fn):
+    r=extract_ratios_bonuses(ROOT/'tests/fixtures'/fn)
+    self.assertEqual(r['ratio_input_mode'],'counts')
+    a=[v['reading'].value for k,v in r['ratios'].items() if k.startswith('attacker.')]
+    d=[v['reading'].value for k,v in r['ratios'].items() if k.startswith('defender.')]
+    self.assertEqual(a,ae); self.assertEqual(d,de)
+
 if __name__=='__main__': unittest.main()

@@ -12,7 +12,7 @@ import numpy as np
 from layout import load_image
 from screenshot_preprocessor import prepare_ratios_bonuses
 from troop_level_reader import TroopLevelRecognizer, card_centers, level_glyphs, tg_glyph
-from outcome_reader import OutcomeDigitRecognizer, _glyphs as _count_glyphs
+from outcome_reader import OutcomeDigitRecognizer, _binary as _count_binary, _norm as _count_norm
 
 BONUS_LABELS=(
     'infantry_attack','infantry_defense','infantry_lethality','infantry_health',
@@ -93,6 +93,53 @@ def _ratio_groups(image,baseline):
     return result
 
 
+
+
+def _troop_count_glyphs(crop):
+    """Segment absolute troop counts from the small text below troop cards.
+
+    At some resize phases, adjacent count digits merge into 2- or 3-digit
+    connected components. Their rendered digit width is about 16 px at canonical
+    size, which is narrower than the Battle Overview number font.
+    """
+    bw=_count_binary(crop)
+    _,_,stats,_=cv2.connectedComponentsWithStats(bw,8)
+    out=[]
+    for x,y,w,h,a in stats[1:]:
+        x,y,w,h,a=map(int,(x,y,w,h,a))
+        if not (16<=h<=32 and 7<=w<=95 and a>=60):
+            continue
+        patch=bw[y:y+h,x:x+w]
+        if w<27:
+            out.append((x,_count_norm(patch)))
+            continue
+        count=max(2,min(5,round(w/16)))
+        proj=(patch>0).sum(axis=0); cuts=[]; prev=0
+        for part in range(1,count):
+            target=round(w*part/count)
+            lo=max(prev+5,target-5); hi=min(w-5,target+6)
+            if hi<=lo:
+                continue
+            cut=lo+int(np.argmin(proj[lo:hi])); cuts.append(cut); prev=cut
+        starts=[0]+cuts; ends=cuts+[w]
+        for start,end in zip(starts,ends):
+            q=patch[:,start:end]
+            if q.shape[1]>=4:
+                out.append((x+start,_count_norm(q)))
+    return [g for _,g in sorted(out,key=lambda z:z[0])]
+
+def _read_troop_count(crop, rec):
+    glyphs=_troop_count_glyphs(crop)
+    if not 4<=len(glyphs)<=8:
+        raise ValueError(f'Unexpected troop-count digit count: {len(glyphs)}')
+    images=rec.images.reshape(len(rec.images),-1)
+    digits=[]; conf=[]
+    for glyph in glyphs:
+        v=glyph.astype(np.float32).reshape(1,-1)/255.0
+        dist=np.mean(np.abs(images-v),axis=1); j=int(np.argmin(dist))
+        digits.append(str(rec.labels[j])); conf.append(max(0.0,1.0-float(dist[j])*2.5))
+    return int(''.join(digits)),float(min(conf))
+
 def ratios_from_counts(counts):
     """Convert visible absolute troop counts to percentages, rounded to 2 decimals."""
     values=[int(v) for v in counts]
@@ -101,6 +148,22 @@ def ratios_from_counts(counts):
         raise ValueError(f'Invalid troop-count total: {total}')
     return [round(v*100.0/total,2) for v in values]
 
+
+
+
+def _read_tg_near(image, center, level_baseline, level_rec):
+    """Read a TG badge near the expected card center.
+
+    Try the calibrated location first. Only if that fails, search a tightly
+    bounded set of offsets used by resized two-card layouts. The recognizer's
+    existing confidence threshold is never lowered.
+    """
+    for offset in (0,-12,-16,-8,8,12,16):
+        try:
+            return level_rec.tg_level(tg_glyph(image,center+offset,level_baseline))
+        except ValueError:
+            continue
+    raise ValueError(f'Could not confidently read TG level near x={center}')
 
 def _count_mode_slots(image, baseline, level_baseline, level_rec):
     """Read troop counts shown under cards and derive per-side percentages.
@@ -116,13 +179,14 @@ def _count_mode_slots(image, baseline, level_baseline, level_rec):
         for center in card_centers(side,3,w):
             x0=max(0,center-75); x1=min(w,center+75)
             crop=image[max(0,baseline-10):min(image.shape[0],baseline+38),x0:x1]
-            glyphs=_count_glyphs(crop)
-            if not 4 <= len(glyphs) <= 8:
+            try:
+                count_value,count_confidence=_read_troop_count(crop,rec)
+            except ValueError:
                 continue
-            reading=rec.read(crop)
-            if reading.confidence < 0.45:
+            if count_confidence < 0.45:
                 continue
-            visible.append((center,reading))
+            from outcome_reader import OutcomeReading
+            visible.append((center,OutcomeReading(count_value,count_confidence)))
         if not 1 <= len(visible) <= 3:
             raise ValueError(f'Expected 1-3 {side} troop-count slots; detected {len(visible)}')
         ratios=ratios_from_counts([r.value for _,r in visible])
@@ -131,7 +195,7 @@ def _count_mode_slots(image, baseline, level_baseline, level_rec):
             result[f'{side}.ratio.slot{i+1}']={
                 'troop_type':TROOP_ORDER[i], 'reading':reading,
                 'troop_level':level_rec.troop_level(level_glyphs(image,center,level_baseline)),
-                'tg_level':level_rec.tg_level(tg_glyph(image,center,level_baseline)),
+                'tg_level':_read_tg_near(image,center,level_baseline,level_rec),
             }
     return result
 
@@ -170,7 +234,7 @@ def extract_ratios_bonuses(image_path:Path|str,recognizer:PercentDigitRecognizer
                 key=f'{side}.ratio.slot{i+1}'
                 ratios[key]={'troop_type':TROOP_ORDER[i],'reading':rec.ratio(glyphs),
                              'troop_level':level_rec.troop_level(level_glyphs(image,center,level_baseline)),
-                             'tg_level':level_rec.tg_level(tg_glyph(image,center,level_baseline))}
+                             'tg_level':_read_tg_near(image,center,level_baseline,level_rec)}
     else:
         ratio_input_mode='counts'
         ratios=_count_mode_slots(image,ratio_baseline,level_baseline,level_rec)

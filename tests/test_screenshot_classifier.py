@@ -16,6 +16,12 @@ class ScreenshotClassifierTests(unittest.TestCase):
     dst=Path(d)/('random_'+str(len(list(Path(d).glob('*.jpg'))))+'.jpg'); shutil.copy2(BASE/name,dst)
     self.assertEqual(classify_image(dst).image_type,expected)
 
+
+ def test_classifies_additional_count_view_regressions(self):
+  for name in ('rb1.jpg','rb2.jpg','rb3.jpg','rb4.jpg'):
+   with self.subTest(name=name):
+    self.assertEqual(classify_image(BASE/'new_rb'/name).image_type,'ratios_bonuses')
+
  def test_folder_ignores_nonimages(self):
   with tempfile.TemporaryDirectory() as d:
    shutil.copy2(BASE/'outcome.jpg',Path(d)/'x.jpg'); (Path(d)/'notes.txt').write_text('x')
