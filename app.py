@@ -11,6 +11,7 @@ from screenshot_classifier import classify_image, classify_folder
 from folder_router import resolve_battle_images
 from batch_ingestion import preflight_batch, ingest_batch
 from battle_metadata import extract_battle_metadata
+from reporting_views import preview_view, REPORTING_VIEWS
 
 
 def main():
@@ -56,8 +57,17 @@ def main():
     batch=sub.add_parser('batch-ingest')
     batch.add_argument('--parent', required=True)
     batch.add_argument('--dry-run', action='store_true')
+    preview=sub.add_parser('preview-view')
+    preview.add_argument('--view', required=True, choices=tuple(REPORTING_VIEWS))
+    preview.add_argument('--limit', type=int, default=10)
     args = parser.parse_args()
-    if args.command == 'batch-ingest':
+    if args.command == 'preview-view':
+        view, columns, rows = preview_view(args.view, args.limit)
+        print(f'{view} rows={len(rows)}')
+        print(' | '.join(columns))
+        for row in rows:
+            print(' | '.join('NULL' if value is None else str(value) for value in row))
+    elif args.command == 'batch-ingest':
         items = preflight_batch(args.parent) if args.dry_run else ingest_batch(args.parent)
         for item in items:
             if item.status == 'READY':

@@ -32,7 +32,7 @@ class DatabaseTests(unittest.TestCase):
             migrations = conn.execute(
                 'SELECT version FROM schema_migrations ORDER BY version'
             ).fetchall()
-            self.assertEqual(migrations, [('001_initial_schema.sql',), ('002_battle_relationship_model.sql',), ('003_hero_role_value_contract.sql',), ('004_troop_levels.sql',), ('005_battle_identity.sql',), ('006_battle_metadata.sql',)])
+            self.assertEqual(migrations, [('001_initial_schema.sql',), ('002_battle_relationship_model.sql',), ('003_hero_role_value_contract.sql',), ('004_troop_levels.sql',), ('005_battle_identity.sql',), ('006_battle_metadata.sql',), ('007_tableau_reporting_views.sql',)])
 
     def test_step10_migration_preserves_existing_battle_with_null_identity(self):
         # Simulate a database created through Step 9.1, then apply Step 10.
@@ -67,7 +67,7 @@ class DatabaseTests(unittest.TestCase):
         db.init_db(self.db_path)
         with closing(db.connect(self.db_path)) as conn:
             count = conn.execute('SELECT COUNT(*) FROM schema_migrations').fetchone()[0]
-            self.assertEqual(count, 6)
+            self.assertEqual(count, 7)
 
     def test_seed_loads_22_heroes_and_is_idempotent(self):
         db.init_db(self.db_path)

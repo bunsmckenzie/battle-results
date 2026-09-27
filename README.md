@@ -159,3 +159,23 @@ python app.py read-battle-metadata --image tests/fixtures/outcome.jpg
 not reported READY if its player names or result cannot be read conservatively.
 Migration `006_battle_metadata.sql` preserves existing battles with NULL metadata;
 reprocess old battles if you want these fields populated.
+
+## Step 12: Tableau reporting views
+
+`python app.py init-db` now creates four read-only SQLite views for analytics while leaving the normalized ingestion tables unchanged:
+
+- `vw_battle_summary` — one wide row per battle.
+- `vw_battle_troops` — six side/troop rows per battle.
+- `vw_battle_bonuses` — twenty-four side/troop/stat rows per battle.
+- `vw_battle_heroes` — lead and joiner hero rows with hero reference attributes.
+
+Preview them from the command line, for example:
+
+```powershell
+python app.py preview-view --view summary --limit 5
+python app.py preview-view --view troops --limit 12
+python app.py preview-view --view bonuses --limit 24
+python app.py preview-view --view heroes --limit 20
+```
+
+The views are intended as the stable analysis interface for Tableau. Connect Tableau to the same `battle_data.sqlite3` database through your chosen SQLite-capable connector and use the `vw_*` objects rather than rebuilding the normalized joins in each workbook.
