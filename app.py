@@ -6,9 +6,10 @@ from hero_values import extract_battle_join_values
 from battle_heroes import analyze_battle_heroes
 from outcome_reader import extract_battle_outcome
 from percent_reader import extract_ratios_bonuses
-from battle_processor import process_battle, load_battle, add_joiner, remove_joiner
+from battle_processor import process_battle, load_battle, add_joiner, remove_joiner, DuplicateBattleError
 from screenshot_classifier import classify_image, classify_folder
 from folder_router import resolve_battle_images
+from batch_ingestion import preflight_batch, ingest_batch
 
 
 def main():
@@ -49,8 +50,28 @@ def main():
     remj.add_argument('--slot', required=True, type=int)
     ci=sub.add_parser('classify-image'); ci.add_argument('--image',required=True)
     cf=sub.add_parser('classify-folder'); cf.add_argument('--folder',required=True)
+    batch=sub.add_parser('batch-ingest')
+    batch.add_argument('--parent', required=True)
+    batch.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
-    if args.command == 'classify-image':
+    if args.command == 'batch-ingest':
+        items = preflight_batch(args.parent) if args.dry_run else ingest_batch(args.parent)
+        for item in items:
+            if item.status == 'READY':
+                print(f'{item.folder}: READY')
+            elif item.status == 'SAVED':
+                print(f'{item.folder}: SAVED {item.battle_key}')
+            elif item.status == 'DUPLICATE':
+                target = item.battle_key or item.duplicate_of or 'another folder in this batch'
+                print(f'{item.folder}: DUPLICATE -> {target}')
+            else:
+                print(f'{item.folder}: {item.status} - {item.error}')
+        ready_saved = sum(i.status in ('READY','SAVED') for i in items)
+        duplicates = sum(i.status == 'DUPLICATE' for i in items)
+        failed = len(items) - ready_saved - duplicates
+        label = 'ready' if args.dry_run else 'saved'
+        print(f'Batch summary: {label}={ready_saved} duplicates={duplicates} failed={failed} total={len(items)}')
+    elif args.command == 'classify-image':
         r=classify_image(args.image); print(f'{r.image_type} confidence={r.confidence:.3f}')
     elif args.command == 'classify-folder':
         for path,r in classify_folder(args.folder).items(): print(f'{path}: {r.image_type} confidence={r.confidence:.3f}')
@@ -94,8 +115,11 @@ def main():
             outcome_image = args.outcome
             heroes_image = args.heroes
             ratios_bonuses_image = args.ratios_bonuses
-        key=process_battle(outcome_image,heroes_image,ratios_bonuses_image,notes=args.notes)
-        print(f'Battle saved: {key}')
+        try:
+            key=process_battle(outcome_image,heroes_image,ratios_bonuses_image,notes=args.notes)
+            print(f'Battle saved: {key}')
+        except DuplicateBattleError as exc:
+            print(f'Battle duplicate: {exc.battle_key} identity={exc.identity}')
     elif args.command == 'add-joiner':
         slot,name=add_joiner(args.battle_key,args.side,args.hero)
         print(f'Joiner added: {args.battle_key} {args.side}.joiner{slot}: {name}')
@@ -105,6 +129,10 @@ def main():
     elif args.command == 'show-battle':
         b=load_battle(args.battle_key)
         print(f'Battle {b["battle"][1]} created={b["battle"][2]}')
+        if b['battle'][7]:
+            print(f'IDENTITY timestamp={b["battle"][4]} x={b["battle"][5]} y={b["battle"][6]} key={b["battle"][7]}')
+        else:
+            print('IDENTITY unavailable (legacy cropped Outcome image)')
         print('OUTCOMES')
         for r in b['outcomes']: print('  '+ ' | '.join(map(str,r)))
         print('RATIOS')

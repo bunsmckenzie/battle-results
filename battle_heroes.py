@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from hero_matcher import match_battle_heroes
+from hero_matcher import match_battle_heroes, HeroMatcher
 from hero_values import extract_battle_join_values
 
 
@@ -19,8 +19,15 @@ class BattleHeroReading:
         return self.name is not None
 
 
-def analyze_battle_heroes(image_path: Path | str) -> dict[str, BattleHeroReading]:
-    matches = match_battle_heroes(image_path)
+_DEFAULT_MATCHER = None
+
+def analyze_battle_heroes(image_path: Path | str, matcher: HeroMatcher | None = None) -> dict[str, BattleHeroReading]:
+    global _DEFAULT_MATCHER
+    if matcher is None:
+        if _DEFAULT_MATCHER is None:
+            _DEFAULT_MATCHER = HeroMatcher()
+        matcher = _DEFAULT_MATCHER
+    matches = match_battle_heroes(image_path, matcher=matcher)
     values = extract_battle_join_values(image_path)
     if matches.keys() != values.keys():
         raise ValueError("Hero matcher and join-value reader returned different slots")

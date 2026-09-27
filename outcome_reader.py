@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from layout import LayoutCatalog, load_image
+from screenshot_preprocessor import prepare_outcome
 
 FIELDS = ('power','squad','losses','injured','lightly_injured','residents')
 SIDES = ('attacker','defender')
@@ -30,15 +31,24 @@ def _glyphs(crop: np.ndarray):
         if 16 <= h <= 32 and 7 <= w <= 28 and a >= 60:
             patch=bw[y:y+h,x:x+w]
             out.append((x,_norm(patch)))
-        elif 16 <= h <= 32 and 29 <= w <= 55 and a >= 120:
-            # Occasionally antialiasing joins adjacent digits. Split at the weakest
-            # vertical valley near the component midpoint.
+        elif 16 <= h <= 32 and 29 <= w <= 95 and a >= 120:
+            # Antialiasing can join two or even three adjacent digits after a
+            # full-screen capture is resized to canonical geometry.  Estimate
+            # the digit count from width, then split near equal-width valleys.
             patch=bw[y:y+h,x:x+w]
+            count=max(2,min(4,round(w/22)))
+            cuts=[]
             proj=(patch>0).sum(axis=0)
-            mid=w//2; lo=max(8,mid-6); hi=min(w-8,mid+7)
-            cut=lo+int(np.argmin(proj[lo:hi]))
-            for ox,p in ((0,patch[:,:cut]),(cut,patch[:,cut:])):
-                if p.shape[1] >= 7: out.append((x+ox,_norm(p)))
+            prev=0
+            for part in range(1,count):
+                target=round(w*part/count)
+                lo=max(prev+6,target-6); hi=min(w-6,target+7)
+                if hi<=lo: continue
+                cut=lo+int(np.argmin(proj[lo:hi])); cuts.append(cut); prev=cut
+            starts=[0]+cuts; ends=cuts+[w]
+            for start,end in zip(starts,ends):
+                q=patch[:,start:end]
+                if q.shape[1]>=5: out.append((x+start,_norm(q)))
     return [p for _,p in sorted(out,key=lambda z:z[0])]
 
 
@@ -74,7 +84,7 @@ class OutcomeDigitRecognizer:
 
 
 def extract_battle_outcome(image_path:Path|str, recognizer:OutcomeDigitRecognizer|None=None):
-    image=load_image(image_path); cat=LayoutCatalog.load(); recognizer=recognizer or OutcomeDigitRecognizer()
+    image=prepare_outcome(load_image(image_path)); cat=LayoutCatalog.load(); recognizer=recognizer or OutcomeDigitRecognizer()
     result={}
     for side in SIDES:
         for field in FIELDS:

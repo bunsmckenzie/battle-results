@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from layout import LayoutCatalog, load_image
+from screenshot_preprocessor import prepare_heroes
 from join_value_recognizer import ConstrainedJoinValueRecognizer
 
 MIN_JOIN_VALUE = 0
@@ -26,7 +27,7 @@ def validate_join_value(value: int) -> int:
 
 
 def extract_battle_join_values(image_path: Path | str, ocr=None) -> dict[str, JoinValueReading]:
-    image = load_image(image_path)
+    image = prepare_heroes(load_image(image_path))
     catalog = LayoutCatalog.load()
     ocr = ocr or ConstrainedJoinValueRecognizer()
     readings = {}

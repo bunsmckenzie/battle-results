@@ -10,7 +10,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 from layout import load_image
+from screenshot_preprocessor import prepare_ratios_bonuses
 from troop_level_reader import TroopLevelRecognizer, card_centers, level_glyphs, tg_glyph
+from outcome_reader import OutcomeDigitRecognizer, _glyphs as _count_glyphs
 
 BONUS_LABELS=(
     'infantry_attack','infantry_defense','infantry_lethality','infantry_health',
@@ -90,6 +92,43 @@ def _ratio_groups(image,baseline):
         result.append(groups)
     return result
 
+
+def _count_mode_slots(image, baseline, level_baseline, level_rec):
+    """Read troop counts shown under cards and derive per-side percentages.
+
+    The game can toggle the Troop Power Comparison between percentage labels and
+    absolute troop counts.  Counts are semantically equivalent for our ratio field,
+    so derive percentages from the visible side total rather than rejecting the
+    screenshot.
+    """
+    rec=OutcomeDigitRecognizer(); w=image.shape[1]; result={}
+    for side in ('attacker','defender'):
+        visible=[]
+        for center in card_centers(side,3,w):
+            x0=max(0,center-75); x1=min(w,center+75)
+            crop=image[max(0,baseline-10):min(image.shape[0],baseline+38),x0:x1]
+            glyphs=_count_glyphs(crop)
+            if not 4 <= len(glyphs) <= 8:
+                continue
+            reading=rec.read(crop)
+            if reading.confidence < 0.45:
+                continue
+            visible.append((center,reading))
+        if not 1 <= len(visible) <= 3:
+            raise ValueError(f'Expected 1-3 {side} troop-count slots; detected {len(visible)}')
+        total=sum(r.value for _,r in visible)
+        if total <= 0:
+            raise ValueError(f'Invalid {side} troop-count total: {total}')
+        for i,(center,count_reading) in enumerate(visible):
+            ratio=round(count_reading.value*100.0/total,2)
+            reading=PercentReading(ratio,round(count_reading.confidence,3))
+            result[f'{side}.ratio.slot{i+1}']={
+                'troop_type':TROOP_ORDER[i], 'reading':reading,
+                'troop_level':level_rec.troop_level(level_glyphs(image,center,level_baseline)),
+                'tg_level':level_rec.tg_level(tg_glyph(image,center,level_baseline)),
+            }
+    return result
+
 class PercentDigitRecognizer:
     def __init__(self,template_path:Path|str|None=None):
         p=Path(template_path or Path(__file__).resolve().parent/'assets'/'percent_digits.npz'); d=np.load(p)
@@ -110,17 +149,21 @@ class PercentDigitRecognizer:
         return PercentReading(float(s[:-2]+'.'+s[-2:]),round(min(c for _,c in pairs),3))
 
 def extract_ratios_bonuses(image_path:Path|str,recognizer:PercentDigitRecognizer|None=None,level_recognizer:TroopLevelRecognizer|None=None):
-    image=load_image(image_path); rec=recognizer or PercentDigitRecognizer(); level_rec=level_recognizer or TroopLevelRecognizer(); rows=_bonus_row_centers(image); w=image.shape[1]
+    image=prepare_ratios_bonuses(load_image(image_path)); rec=recognizer or PercentDigitRecognizer(); level_rec=level_recognizer or TroopLevelRecognizer(); rows=_bonus_row_centers(image); w=image.shape[1]
     bonuses={}
     for side,xmin,xmax in (('attacker',0.11*w,0.34*w),('defender',0.60*w,0.94*w)):
         for label,cy in zip(BONUS_LABELS,rows): bonuses[f'{side}.{label}']=rec.bonus(_bonus_glyphs(image,cy,xmin,xmax))
-    ratio_groups=_ratio_groups(image,rows[0]-202); ratios={}
-    for side,groups in zip(('attacker','defender'),ratio_groups):
-        if not 1<=len(groups)<=3: raise ValueError(f'Expected 1-3 {side} ratio slots; detected {len(groups)}')
-        centers=card_centers(side,len(groups),w); level_baseline=rows[0]-242
-        for i,(glyphs,center) in enumerate(zip(groups,centers)):
-            key=f'{side}.ratio.slot{i+1}'
-            ratios[key]={'troop_type':TROOP_ORDER[i],'reading':rec.ratio(glyphs),
-                         'troop_level':level_rec.troop_level(level_glyphs(image,center,level_baseline)),
-                         'tg_level':level_rec.tg_level(tg_glyph(image,center,level_baseline))}
+    ratio_baseline=rows[0]-202; level_baseline=rows[0]-242
+    ratio_groups=_ratio_groups(image,ratio_baseline); ratios={}
+    if any(ratio_groups):
+        for side,groups in zip(('attacker','defender'),ratio_groups):
+            if not 1<=len(groups)<=3: raise ValueError(f'Expected 1-3 {side} ratio slots; detected {len(groups)}')
+            centers=card_centers(side,len(groups),w)
+            for i,(glyphs,center) in enumerate(zip(groups,centers)):
+                key=f'{side}.ratio.slot{i+1}'
+                ratios[key]={'troop_type':TROOP_ORDER[i],'reading':rec.ratio(glyphs),
+                             'troop_level':level_rec.troop_level(level_glyphs(image,center,level_baseline)),
+                             'tg_level':level_rec.tg_level(tg_glyph(image,center,level_baseline))}
+    else:
+        ratios=_count_mode_slots(image,ratio_baseline,level_baseline,level_rec)
     return {'ratios':ratios,'bonuses':bonuses}

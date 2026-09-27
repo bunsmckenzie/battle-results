@@ -6,9 +6,50 @@ import db
 from battle_heroes import analyze_battle_heroes
 from outcome_reader import extract_battle_outcome
 from percent_reader import extract_ratios_bonuses, TROOP_ORDER
+from battle_identity import extract_battle_identity, BattleIdentity
 
 SIDES=('attacker','defender')
 STATS=('attack','defense','lethality','health')
+
+
+class DuplicateBattleError(ValueError):
+    def __init__(self, battle_key: str, identity: str):
+        self.battle_key = battle_key
+        self.identity = identity
+        super().__init__(f'Duplicate battle {identity}; already stored as {battle_key}')
+
+
+def _database_path(db_path=None):
+    return Path(db_path) if db_path is not None else db.DB_PATH
+
+
+def find_duplicate_battle(identity: BattleIdentity | None, db_path=None):
+    """Return existing battle_key for identity without creating/upgrading a DB."""
+    if identity is None:
+        return None
+    path = _database_path(db_path)
+    if not path.exists():
+        return None
+    with closing(db.connect(path)) as conn:
+        columns={row[1] for row in conn.execute('PRAGMA table_info(battles)')}
+        if 'battle_identity' in columns:
+            row=conn.execute('SELECT battle_key FROM battles WHERE battle_identity=?',(identity.key,)).fetchone()
+            if row:
+                return row[0]
+            legacy=conn.execute('SELECT battle_key,outcome_image FROM battles WHERE battle_identity IS NULL').fetchall()
+        else:
+            # Step 9.1 database: compare against stored Outcome paths in memory without modifying the DB.
+            legacy=conn.execute('SELECT battle_key,outcome_image FROM battles').fetchall()
+        for battle_key,outcome_image in legacy:
+            if not outcome_image:
+                continue
+            try:
+                old_identity=extract_battle_identity(outcome_image)
+            except (OSError, ValueError):
+                continue
+            if old_identity is not None and old_identity.key == identity.key:
+                return battle_key
+        return None
 
 
 def _slot_parts(slot: str):
@@ -34,25 +75,41 @@ def normalize_ratios(extracted):
 
 
 def extract_complete_battle(outcome_image, heroes_image, ratios_bonuses_image):
+    identity=extract_battle_identity(outcome_image)
     outcome=extract_battle_outcome(outcome_image)
     heroes=analyze_battle_heroes(heroes_image)
     rb=extract_ratios_bonuses(ratios_bonuses_image)
     unknown=[slot for slot,r in heroes.items() if not r.accepted]
     if unknown:
         raise ValueError('Unrecognized lead hero(s): '+', '.join(unknown))
-    return {'outcome':outcome,'heroes':heroes,'ratios':normalize_ratios(rb['ratios']),'bonuses':rb['bonuses']}
+    return {'identity':identity,'outcome':outcome,'heroes':heroes,'ratios':normalize_ratios(rb['ratios']),'bonuses':rb['bonuses']}
 
 
 def process_battle(outcome_image, heroes_image, ratios_bonuses_image, db_path=None, notes=None):
     data=extract_complete_battle(outcome_image,heroes_image,ratios_bonuses_image)
     db.init_db(db_path); db.seed_heroes(db_path)
+    legacy_duplicate=find_duplicate_battle(data['identity'], db_path=db_path)
+    if legacy_duplicate and data['identity'] is not None:
+        raise DuplicateBattleError(legacy_duplicate, data['identity'].key)
     with closing(db.connect(db_path)) as conn:
         try:
             conn.execute('BEGIN IMMEDIATE')
+            identity=data['identity']
+            if identity is not None:
+                duplicate=conn.execute('SELECT battle_key FROM battles WHERE battle_identity=?',(identity.key,)).fetchone()
+                if duplicate:
+                    raise DuplicateBattleError(duplicate[0], identity.key)
             next_id=conn.execute('SELECT COALESCE(MAX(battle_id),0)+1 FROM battles').fetchone()[0]
             battle_key=f'B{next_id:06d}'
-            cur=conn.execute('''INSERT INTO battles(battle_id,battle_key,outcome_image,heroes_image,ratios_bonuses_image,notes)
-                VALUES (?,?,?,?,?,?)''',(next_id,battle_key,str(outcome_image),str(heroes_image),str(ratios_bonuses_image),notes))
+            cur=conn.execute('''INSERT INTO battles(
+                    battle_id,battle_key,outcome_image,heroes_image,ratios_bonuses_image,notes,
+                    battle_timestamp,coord_x,coord_y,battle_identity)
+                VALUES (?,?,?,?,?,?,?,?,?,?)''',(
+                    next_id,battle_key,str(outcome_image),str(heroes_image),str(ratios_bonuses_image),notes,
+                    identity.battle_timestamp if identity else None,
+                    identity.coord_x if identity else None,
+                    identity.coord_y if identity else None,
+                    identity.key if identity else None))
             battle_id=cur.lastrowid or next_id
             for side in SIDES:
                 vals=[data['outcome'][f'{side}.{f}'].value for f in ('power','squad','losses','injured','lightly_injured','residents')]
@@ -81,7 +138,8 @@ def process_battle(outcome_image, heroes_image, ratios_bonuses_image, db_path=No
 
 def load_battle(battle_key,db_path=None):
     with closing(db.connect(db_path)) as conn:
-        row=conn.execute('SELECT battle_id,battle_key,created_at,notes FROM battles WHERE battle_key=?',(battle_key,)).fetchone()
+        row=conn.execute('''SELECT battle_id,battle_key,created_at,notes,battle_timestamp,coord_x,coord_y,battle_identity
+            FROM battles WHERE battle_key=?''',(battle_key,)).fetchone()
         if not row: raise KeyError(f'Battle not found: {battle_key}')
         bid=row[0]
         return {

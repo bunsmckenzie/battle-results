@@ -109,3 +109,24 @@ python app.py remove-joiner B000001 --side attacker --slot 1
 ```
 
 Join values must be integers from 0 through 10. Hero names are validated against the seeded hero catalog. Joiner slots are assigned independently for attacker and defender.
+
+## Step 9.1: full-screen routing and troop-count view
+
+Batch folders may contain full Kingshot report screenshots in any filename/order. The
+router normalizes supported full-screen captures before reading the Outcome and Hero
+Comparison sections. Ratios/Bonuses accepts either percentage labels or the game's
+troop-count display; in count mode it derives each side's troop percentages from the
+visible troop counts and still reads troop_level and tg_level from the troop cards.
+
+## Step 10: Battle identity and duplicate protection
+
+Full Outcome screenshots now provide a stable logical identity from the report header:
+
+- battle timestamp
+- X coordinate
+- Y coordinate
+- normalized `battle_identity` key, e.g. `2026-09-26T09:56:21@597,597`
+
+Migration `005_battle_identity.sql` stores these fields on `battles` and adds a unique index for non-null identities. Legacy cropped Outcome images remain supported but cannot provide header identity and therefore retain NULL identity fields.
+
+Batch dry-run and real ingestion report duplicates separately and do not insert them. Dry-run does not modify the database, including when checking a Step 9.1 database that predates the identity migration.

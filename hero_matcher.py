@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 
 from layout import BASE_DIR, LayoutCatalog, load_image
+from screenshot_preprocessor import prepare_heroes
 
 DEFAULT_LOOKUP = BASE_DIR / "assets" / "heroes" / "hero_lookup.png"
 
@@ -135,7 +136,7 @@ class HeroMatcher:
 
 
 def match_battle_heroes(image_path: Path | str, matcher: HeroMatcher | None = None) -> dict[str, HeroMatch]:
-    image = load_image(image_path)
+    image = prepare_heroes(load_image(image_path))
     catalog = LayoutCatalog.load()
     matcher = matcher or HeroMatcher()
     result = {}
