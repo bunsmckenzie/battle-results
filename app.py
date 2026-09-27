@@ -10,6 +10,7 @@ from battle_processor import process_battle, load_battle, add_joiner, remove_joi
 from screenshot_classifier import classify_image, classify_folder
 from folder_router import resolve_battle_images
 from batch_ingestion import preflight_batch, ingest_batch
+from battle_metadata import extract_battle_metadata
 
 
 def main():
@@ -27,6 +28,8 @@ def main():
     values.add_argument('--image', required=True)
     outcome = sub.add_parser('read-outcome')
     outcome.add_argument('--image', required=True)
+    metadata = sub.add_parser('read-battle-metadata')
+    metadata.add_argument('--image', required=True)
     rb = sub.add_parser('read-ratios-bonuses')
     rb.add_argument('--image', required=True)
     combined = sub.add_parser('analyze-heroes')
@@ -90,6 +93,11 @@ def main():
     elif args.command == 'read-outcome':
         for field, reading in extract_battle_outcome(args.image).items():
             print(f'{field}: {reading.value:,} confidence={reading.confidence:.3f}')
+    elif args.command == 'read-battle-metadata':
+        m=extract_battle_metadata(args.image)
+        print(f'attacker_name: {m.attacker_name}')
+        print(f'defender_name: {m.defender_name}')
+        print(f'result: {m.result}')
     elif args.command == 'read-ratios-bonuses':
         result = extract_ratios_bonuses(args.image)
         for slot, item in result['ratios'].items():
@@ -133,6 +141,10 @@ def main():
             print(f'IDENTITY timestamp={b["battle"][4]} x={b["battle"][5]} y={b["battle"][6]} key={b["battle"][7]}')
         else:
             print('IDENTITY unavailable (legacy cropped Outcome image)')
+        if b['battle'][8] or b['battle'][9] or b['battle'][10]:
+            print(f'METADATA result={b["battle"][10]} attacker={b["battle"][8]} defender={b["battle"][9]}')
+        else:
+            print('METADATA unavailable (legacy battle; reprocess to populate)')
         print('OUTCOMES')
         for r in b['outcomes']: print('  '+ ' | '.join(map(str,r)))
         print('RATIOS')

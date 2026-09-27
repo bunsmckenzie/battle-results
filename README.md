@@ -130,3 +130,32 @@ Full Outcome screenshots now provide a stable logical identity from the report h
 Migration `005_battle_identity.sql` stores these fields on `battles` and adds a unique index for non-null identities. Legacy cropped Outcome images remain supported but cannot provide header identity and therefore retain NULL identity fields.
 
 Batch dry-run and real ingestion report duplicates separately and do not insert them. Dry-run does not modify the database, including when checking a Step 9.1 database that predates the identity migration.
+
+## Step 11: player names and result
+
+The Outcome panel now stores three human-readable fields on each battle:
+
+- `attacker_name` — alliance tag removed before OCR
+- `defender_name` — alliance tag removed before OCR
+- `result` — normalized to `VICTORY` or `DEFEAT`
+
+Free-form player names use Tesseract OCR. Tesseract must be installed locally and
+available as `tesseract` on PATH. On Windows the reader also checks the common
+`C:\Program Files\Tesseract-OCR\tesseract.exe` installation path.
+
+Verify the OCR prerequisite with:
+
+```powershell
+tesseract --version
+```
+
+Inspect metadata before ingesting with:
+
+```powershell
+python app.py read-battle-metadata --image tests/fixtures/outcome.jpg
+```
+
+`batch-ingest --dry-run` validates metadata OCR as part of preflight, so a battle is
+not reported READY if its player names or result cannot be read conservatively.
+Migration `006_battle_metadata.sql` preserves existing battles with NULL metadata;
+reprocess old battles if you want these fields populated.

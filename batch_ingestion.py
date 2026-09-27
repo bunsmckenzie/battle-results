@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from folder_router import resolve_battle_images
 from battle_identity import extract_battle_identity
+from battle_metadata import extract_battle_metadata
 from battle_processor import process_battle, find_duplicate_battle, DuplicateBattleError
 
 
@@ -33,6 +34,7 @@ def preflight_batch(parent, db_path=None):
         try:
             images=resolve_battle_images(folder)
             identity=extract_battle_identity(images['outcome'])
+            extract_battle_metadata(images['outcome'])  # validate Step 11 metadata during dry-run
             if identity is not None:
                 existing=find_duplicate_battle(identity, db_path=db_path)
                 if existing:

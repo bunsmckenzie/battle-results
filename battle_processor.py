@@ -7,6 +7,7 @@ from battle_heroes import analyze_battle_heroes
 from outcome_reader import extract_battle_outcome
 from percent_reader import extract_ratios_bonuses, TROOP_ORDER
 from battle_identity import extract_battle_identity, BattleIdentity
+from battle_metadata import extract_battle_metadata
 
 SIDES=('attacker','defender')
 STATS=('attack','defense','lethality','health')
@@ -76,13 +77,14 @@ def normalize_ratios(extracted):
 
 def extract_complete_battle(outcome_image, heroes_image, ratios_bonuses_image):
     identity=extract_battle_identity(outcome_image)
+    metadata=extract_battle_metadata(outcome_image)
     outcome=extract_battle_outcome(outcome_image)
     heroes=analyze_battle_heroes(heroes_image)
     rb=extract_ratios_bonuses(ratios_bonuses_image)
     unknown=[slot for slot,r in heroes.items() if not r.accepted]
     if unknown:
         raise ValueError('Unrecognized lead hero(s): '+', '.join(unknown))
-    return {'identity':identity,'outcome':outcome,'heroes':heroes,'ratios':normalize_ratios(rb['ratios']),'bonuses':rb['bonuses']}
+    return {'identity':identity,'metadata':metadata,'outcome':outcome,'heroes':heroes,'ratios':normalize_ratios(rb['ratios']),'bonuses':rb['bonuses']}
 
 
 def process_battle(outcome_image, heroes_image, ratios_bonuses_image, db_path=None, notes=None):
@@ -103,13 +105,14 @@ def process_battle(outcome_image, heroes_image, ratios_bonuses_image, db_path=No
             battle_key=f'B{next_id:06d}'
             cur=conn.execute('''INSERT INTO battles(
                     battle_id,battle_key,outcome_image,heroes_image,ratios_bonuses_image,notes,
-                    battle_timestamp,coord_x,coord_y,battle_identity)
-                VALUES (?,?,?,?,?,?,?,?,?,?)''',(
+                    battle_timestamp,coord_x,coord_y,battle_identity,attacker_name,defender_name,result)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
                     next_id,battle_key,str(outcome_image),str(heroes_image),str(ratios_bonuses_image),notes,
                     identity.battle_timestamp if identity else None,
                     identity.coord_x if identity else None,
                     identity.coord_y if identity else None,
-                    identity.key if identity else None))
+                    identity.key if identity else None,
+                    data['metadata'].attacker_name,data['metadata'].defender_name,data['metadata'].result))
             battle_id=cur.lastrowid or next_id
             for side in SIDES:
                 vals=[data['outcome'][f'{side}.{f}'].value for f in ('power','squad','losses','injured','lightly_injured','residents')]
@@ -138,7 +141,7 @@ def process_battle(outcome_image, heroes_image, ratios_bonuses_image, db_path=No
 
 def load_battle(battle_key,db_path=None):
     with closing(db.connect(db_path)) as conn:
-        row=conn.execute('''SELECT battle_id,battle_key,created_at,notes,battle_timestamp,coord_x,coord_y,battle_identity
+        row=conn.execute('''SELECT battle_id,battle_key,created_at,notes,battle_timestamp,coord_x,coord_y,battle_identity,attacker_name,defender_name,result
             FROM battles WHERE battle_key=?''',(battle_key,)).fetchone()
         if not row: raise KeyError(f'Battle not found: {battle_key}')
         bid=row[0]

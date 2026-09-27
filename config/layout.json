@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "layouts": {
+    "outcome": {
+      "description": "Battle Overview: attacker values on left, defender values on right.",
+      "regions": {
+        "attacker.power": [
+          0.08,
+          0.455,
+          0.355,
+          0.515
+        ],
+        "defender.power": [
+          0.64,
+          0.455,
+          0.93,
+          0.515
+        ],
+        "attacker.squad": [
+          0.105,
+          0.54,
+          0.345,
+          0.6
+        ],
+        "defender.squad": [
+          0.665,
+          0.54,
+          0.92,
+          0.6
+        ],
+        "attacker.losses": [
+          0.13,
+          0.625,
+          0.33,
+          0.685
+        ],
+        "defender.losses": [
+          0.685,
+          0.625,
+          0.9,
+          0.685
+        ],
+        "attacker.injured": [
+          0.105,
+          0.715,
+          0.35,
+          0.775
+        ],
+        "defender.injured": [
+          0.665,
+          0.715,
+          0.925,
+          0.775
+        ],
+        "attacker.lightly_injured": [
+          0.085,
+          0.805,
+          0.355,
+          0.865
+        ],
+        "defender.lightly_injured": [
+          0.665,
+          0.805,
+          0.93,
+          0.865
+        ],
+        "attacker.residents": [
+          0.12,
+          0.895,
+          0.34,
+          0.955
+        ],
+        "defender.residents": [
+          0.675,
+          0.895,
+          0.925,
+          0.955
+        ]
+      }
+    },
+    "hero_comparison": {
+      "description": "Three hero rows. Each side has a portrait and the single top-most adjacent equipment value ROI.",
+      "regions": {
+        "attacker.hero1.portrait": [
+          0.05,
+          0.14,
+          0.175,
+          0.315
+        ],
+        "attacker.hero1.join_value": [
+          0.19,
+          0.135,
+          0.285,
+          0.245
+        ],
+        "defender.hero1.join_value": [
+          0.735,
+          0.135,
+          0.825,
+          0.245
+        ],
+        "defender.hero1.portrait": [
+          0.825,
+          0.14,
+          0.955,
+          0.315
+        ],
+        "attacker.hero2.portrait": [
+          0.05,
+          0.42,
+          0.175,
+          0.595
+        ],
+        "attacker.hero2.join_value": [
+          0.19,
+          0.415,
+          0.285,
+          0.525
+        ],
+        "defender.hero2.join_value": [
+          0.735,
+          0.415,
+          0.825,
+          0.525
+        ],
+        "defender.hero2.portrait": [
+          0.825,
+          0.42,
+          0.955,
+          0.595
+        ],
+        "attacker.hero3.portrait": [
+          0.05,
+          0.7,
+          0.175,
+          0.875
+        ],
+        "attacker.hero3.join_value": [
+          0.19,
+          0.695,
+          0.285,
+          0.805
+        ],
+        "defender.hero3.join_value": [
+          0.735,
+          0.695,
+          0.825,
+          0.805
+        ],
+        "defender.hero3.portrait": [
+          0.825,
+          0.7,
+          0.955,
+          0.875
+        ]
+      }
+    },
+    "ratios_bonuses": {
+      "description": "Troop ratio percentages and the 12 stat-bonus rows.",
+      "regions": {
+        "attacker.bonuses": [
+          0.1,
+          0.455,
+          0.36,
+          0.895
+        ],
+        "bonus.labels": [
+          0.355,
+          0.455,
+          0.65,
+          0.895
+        ],
+        "defender.bonuses": [
+          0.65,
+          0.455,
+          0.925,
+          0.895
+        ],
+        "attacker.ratio.slot1.icon": [
+          0.04,
+          0.325,
+          0.17,
+          0.385
+        ],
+        "attacker.ratio.slot1.value": [
+          0.04,
+          0.38,
+          0.18,
+          0.41
+        ],
+        "attacker.ratio.slot2.icon": [
+          0.175,
+          0.325,
+          0.31,
+          0.385
+        ],
+        "attacker.ratio.slot2.value": [
+          0.175,
+          0.38,
+          0.33,
+          0.41
+        ],
+        "attacker.ratio.slot3.icon": [
+          0.315,
+          0.325,
+          0.45,
+          0.385
+        ],
+        "attacker.ratio.slot3.value": [
+          0.315,
+          0.38,
+          0.465,
+          0.41
+        ],
+        "defender.ratio.slot1.icon": [
+          0.68,
+          0.325,
+          0.825,
+          0.385
+        ],
+        "defender.ratio.slot1.value": [
+          0.68,
+          0.38,
+          0.83,
+          0.41
+        ],
+        "defender.ratio.slot2.icon": [
+          0.82,
+          0.325,
+          0.965,
+          0.385
+        ],
+        "defender.ratio.slot2.value": [
+          0.82,
+          0.38,
+          0.97,
+          0.41
+        ]
+      }
+    }
+  }
+}
