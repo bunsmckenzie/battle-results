@@ -19,6 +19,23 @@ class BattleMetadataTests(unittest.TestCase):
         self.assertEqual((m.attacker_name, m.defender_name, m.result),
                          ('Meridian', 'Al KaabiUAE', 'DEFEAT'))
 
+    def test_full_victory_outcome_reads_victory(self):
+        m = extract_battle_metadata(FIX / 'full_outcome_victory.jpg')
+        self.assertEqual(m.attacker_name, 'Meridian')
+        self.assertEqual(m.defender_name, 'Al KaabiUAE')
+        self.assertEqual(m.result, 'VICTORY')
+
+    def test_result_template_rejects_unknown_banner(self):
+        import cv2
+        import numpy as np
+        from battle_metadata import _read_result
+        outcome = cv2.imread(str(FIX / 'outcome.jpg'))
+        self.assertIsNotNone(outcome)
+        outcome = outcome.copy()
+        outcome[135:245, 350:660] = np.full((110,310,3), 127, dtype=np.uint8)
+        with self.assertRaisesRegex(ValueError, 'Unrecognized battle result'):
+            _read_result(outcome)
+
 
 if __name__ == '__main__':
     unittest.main()

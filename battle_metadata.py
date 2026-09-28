@@ -36,6 +36,9 @@ _NAME_BOXES = {
     'defender': (590, 285, 970, 360),
 }
 _RESULT_BOX = (350, 135, 660, 245)
+_RESULT_TEMPLATES = Path(__file__).resolve().parent / 'assets' / 'battle_result_templates.npz'
+_RESULT_TEMPLATE_MIN_SCORE = 0.55
+_RESULT_TEMPLATE_MIN_MARGIN = 0.12
 
 
 def _find_tesseract() -> str:
@@ -159,17 +162,40 @@ def _read_player_name(outcome: np.ndarray, side: str) -> str:
 
 
 def _read_result(outcome: np.ndarray) -> str:
+    """Classify the fixed Kingshot result banner as VICTORY or DEFEAT.
+
+    Result text is intentionally *not* free-form OCR. Kingshot exposes exactly two
+    supported states, and their rendered banners differ substantially. Edge-template
+    matching is deterministic across platforms and avoids Tesseract hallucinations
+    such as ``MENOR`` on the gold VICTORY treatment. A score and winner margin are
+    both required; uncertain banners are rejected rather than guessed.
+    """
     x1, y1, x2, y2 = _RESULT_BOX
     crop = outcome[y1:y2, x1:x2]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    bw = cv2.threshold(gray, 175, 255, cv2.THRESH_BINARY)[1]
-    bw = cv2.resize(bw, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-    text = re.sub(r'[^A-Z]', '', _ocr_binary(bw, 7).upper())
-    if 'VICTORY' in text:
-        return 'VICTORY'
-    if 'DEFEAT' in text:
-        return 'DEFEAT'
-    raise ValueError(f'Unrecognized battle result: {text or "<blank>"}')
+    edges = cv2.Canny(gray, 60, 160)
+
+    with np.load(_RESULT_TEMPLATES) as templates:
+        scores = {}
+        for label in ('victory', 'defeat'):
+            template = templates[label]
+            if template.shape != edges.shape:
+                raise RuntimeError(
+                    f'Battle-result template geometry mismatch: {label}={template.shape}, '
+                    f'current={edges.shape}'
+                )
+            score = float(cv2.matchTemplate(edges, template, cv2.TM_CCOEFF_NORMED)[0, 0])
+            scores[label.upper()] = score
+
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    (winner, best), (_, second) = ranked
+    if best >= _RESULT_TEMPLATE_MIN_SCORE and (best - second) >= _RESULT_TEMPLATE_MIN_MARGIN:
+        return winner
+
+    raise ValueError(
+        'Unrecognized battle result: '
+        f'VICTORY score={scores["VICTORY"]:.3f}, DEFEAT score={scores["DEFEAT"]:.3f}'
+    )
 
 
 def extract_battle_metadata(image_path: Path | str) -> BattleMetadata:
