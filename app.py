@@ -12,6 +12,7 @@ from folder_router import resolve_battle_images
 from batch_ingestion import preflight_batch, ingest_batch
 from battle_metadata import extract_battle_metadata
 from reporting_views import preview_view, REPORTING_VIEWS
+from tableau_export import export_tableau
 
 
 def main():
@@ -60,8 +61,15 @@ def main():
     preview=sub.add_parser('preview-view')
     preview.add_argument('--view', required=True, choices=tuple(REPORTING_VIEWS))
     preview.add_argument('--limit', type=int, default=10)
+    export=sub.add_parser('export-tableau')
+    export.add_argument('--output', required=True)
     args = parser.parse_args()
-    if args.command == 'preview-view':
+    if args.command == 'export-tableau':
+        results = export_tableau(args.output)
+        for result in results:
+            print(f'{result.name}: {result.row_count} rows -> {result.path}')
+        print(f'Tableau export complete: {len(results)} files')
+    elif args.command == 'preview-view':
         view, columns, rows = preview_view(args.view, args.limit)
         print(f'{view} rows={len(rows)}')
         print(' | '.join(columns))

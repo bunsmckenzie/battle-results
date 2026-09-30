@@ -179,3 +179,20 @@ python app.py preview-view --view heroes --limit 20
 ```
 
 The views are intended as the stable analysis interface for Tableau. Connect Tableau to the same `battle_data.sqlite3` database through your chosen SQLite-capable connector and use the `vw_*` objects rather than rebuilding the normalized joins in each workbook.
+
+## Step 12.4 - Tableau CSV export
+
+For Tableau editions that cannot connect to SQLite through ODBC, export the reporting views to stable CSV files:
+
+```powershell
+python app.py export-tableau --output "C:\Users\scl20\OneDrive\Documents\TableauBattleData"
+```
+
+This creates or replaces:
+
+- `battle_summary.csv` - one row per battle
+- `battle_troops.csv` - six troop rows per battle
+- `battle_bonuses.csv` - 24 bonus rows per battle
+- `battle_heroes.csv` - lead and joiner hero rows
+
+The CSVs use UTF-8 with a BOM for Windows/Tableau compatibility. Existing export files are safely replaced, not appended, so Tableau can continue refreshing the same file paths after new battles are ingested.
