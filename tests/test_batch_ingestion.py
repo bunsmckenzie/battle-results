@@ -58,9 +58,9 @@ class BatchIngestionTests(unittest.TestCase):
             shutil.copy2(FIX/'full_heroes.jpg', battle/'Screenshot_155151.jpg')
             shutil.copy2(FIX/'full_outcome.jpg', battle/'Screenshot_155241.jpg')
             shutil.copy2(FIX/'full_ratios_counts.jpg', battle/'Screenshot_155247.jpg')
-            preflight=preflight_batch(parent)
-            self.assertEqual([(i.status,i.error) for i in preflight],[('READY',None)])
             db_path=root/'batch.sqlite3'
+            preflight=preflight_batch(parent,db_path=db_path)
+            self.assertEqual([(i.status,i.error) for i in preflight],[('READY',None)])
             items=ingest_batch(parent,db_path=db_path)
             self.assertEqual([(i.status,i.battle_key) for i in items],[('SAVED','B000001')])
             data=load_battle('B000001',db_path=db_path)
